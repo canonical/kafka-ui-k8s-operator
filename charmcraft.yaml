@@ -1,0 +1,57 @@
+type: charm
+name: kafka-ui-k8s
+title: Kafka UI K8s Charm
+summary: A good charm for Kafka UI
+description: |
+  Stuff for the Kafka UI charm
+  Stuff for the Kafka UI charm
+  Stuff for the Kafka UI charm
+  Stuff for the Kafka UI charm
+assumes:
+  - k8s-api
+
+containers:
+  kafka-ui:
+    resource: kafka-ui-image
+
+resources:
+  kafka-image:
+    type: oci-image
+    description: OCI Image for Kafka UI
+    upstream-source: ghcr.io/canonical/charmed-kafka-ui@sha256:<FIXME>
+
+platforms:
+  ubuntu@24.04:amd64:
+
+peers:
+  cluster:
+    interface: cluster
+  restart:
+    interface: rolling_op
+
+requires:
+  kafka-client:
+    interface: kafka_client
+    optional: false
+    limit: 1
+  karapace-client:
+    interface: karapace_client
+    optional: true
+    limit: 1
+  connect-client:
+    interface: connect_client
+    optional: true
+    limit: 1
+  certificates:
+    interface: tls-certificates
+    limit: 1
+    optional: true
+
+parts:
+  charm:
+    plugin: uv
+    source: .
+    build-snaps:
+      - astral-uv
+
+
