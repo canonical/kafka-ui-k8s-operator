@@ -73,6 +73,10 @@ jobs:
         run: |
           sudo snap install --classic astral-uv
           uv tool install tox --with tox-uv
+      - name: Enable metallb
+        run: |
+          IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
+          sudo microk8s enable metallb:$IPADDR-$IPADDR
       - name: Download packed charm(s)
         uses: actions/download-artifact@v4
         with:
