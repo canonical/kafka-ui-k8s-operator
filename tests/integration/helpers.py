@@ -30,7 +30,6 @@ SECRET_KEY = "admin-password"
 
 IMAGE_RESOURCE_KEY = "oci-image"
 IMAGE_URI = METADATA["resources"]["oci-image"]["upstream-source"]
-IMAGE_URI = "localhost:32000/charmed-kafka-ui:v3"
 
 
 def all_active_idle(status: jubilant.Status, *apps: str):
