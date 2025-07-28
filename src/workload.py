@@ -122,7 +122,7 @@ class Workload(WorkloadBase):
             "-Xmx1G",
             "-XX:+UseG1GC",
             "-jar",
-            "/opt/kafka-ui/libs/api-1.2.0.jar",
+            "/opt/kafka-ui/libs/api-1.3.0.jar",
         ]
 
         layer_config: pebble.LayerDict = {
