@@ -56,6 +56,7 @@ def test_build_and_deploy(juju: jubilant.Juju, ui_charm: Path, tls_enabled: bool
         lambda status: (
             jubilant.all_agents_idle(status, *_apps)
             and jubilant.all_blocked(status, APP_NAME, CONNECT_APP)
+            and jubilant.all_active(status, KAFKA_APP, TRAEFIK_APP, TLS_APP)
         ),
         delay=3,
         timeout=1200,
