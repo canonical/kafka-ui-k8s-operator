@@ -50,7 +50,10 @@ jobs:
       matrix:
         tox-environments:
           - integration
-    name: ${{ matrix.tox-environments }}
+        tls:
+          - "--tls"
+          - ""
+    name: Integration ${{ matrix.tls }}
     needs:
       - lint
       - build
@@ -62,7 +65,8 @@ jobs:
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
-          provider: lxd
+          provider: microk8s
+          channel: "1.28-strict/stable"
           juju-channel: 3.6/stable
           bootstrap-options: "--agent-version 3.6.8"
       - name: Install tools

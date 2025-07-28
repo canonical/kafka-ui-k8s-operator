@@ -12,13 +12,13 @@ assumes:
 
 containers:
   kafka-ui:
-    resource: kafka-ui-image
+    resource: oci-image
 
 resources:
-  kafka-image:
+  oci-image:
     type: oci-image
     description: OCI Image for Kafka UI
-    upstream-source: ghcr.io/canonical/charmed-kafka-ui@sha256:<FIXME>
+    upstream-source: ghcr.io/canonical/charmed-kafka-ui@sha256:b67df704bc08ef16f1ae8c5633c81b07a2c86d0b0163fd5f66d8369728262bc0
 
 platforms:
   ubuntu@24.04:amd64:
@@ -46,6 +46,9 @@ requires:
     interface: tls-certificates
     limit: 1
     optional: true
+  ingress:
+      interface: ingress
+      limit: 1
 
 parts:
   charm:
