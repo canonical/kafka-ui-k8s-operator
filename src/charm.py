@@ -26,6 +26,7 @@ from literals import (
     KAFKA_CONNECT_REL,
     KAFKA_REL,
     KARAPACE_REL,
+    PORT,
     SUBSTRATE,
     DebugLevel,
     Status,
@@ -78,7 +79,7 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
             self.framework.observe(self.on[relation].relation_broken, self._on_config_changed)
 
         if SUBSTRATE == "k8s":
-            self.ingress = IngressPerAppRequirer(self, port=8080, scheme="http")
+            self.ingress = IngressPerAppRequirer(self, port=PORT, scheme="http")
 
     def _on_config_changed(self, event: ops.EventBase) -> None:
         """Handle `config-changed` and general client `relation-changed` events."""

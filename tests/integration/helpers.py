@@ -26,7 +26,6 @@ TLS_APP = "self-signed-certificates"
 TRAEFIK_APP = "traefik-k8s"
 TRAEFIK_CHANNEL = "1.0/stable"
 
-PORT = 8080
 PROTO = "https"
 SECRET_KEY = "admin-password"
 

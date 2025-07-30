@@ -20,6 +20,7 @@ USER_NAME = "root"
 GROUP = "root"
 CONFIG_DIR = "/etc/kafka-ui"
 SUBSTRATE = "k8s"
+PORT = 8080
 
 
 DEFAULT_SECURITY_MECHANISM = "SCRAM-SHA-512"

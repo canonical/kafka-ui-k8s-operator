@@ -28,6 +28,7 @@ from literals import (
     KAFKA_REL,
     KARAPACE_REL,
     PEER_REL,
+    PORT,
     SUBSTRATE,
     Status,
     Substrates,
@@ -529,7 +530,7 @@ class Context(WithStatus, Object):
     def endpoint(self) -> str:
         """Returns the UI web server endpoint."""
         proto = "http" if not SUBSTRATE == "k8s" else "https"
-        return f"{proto}://{self.unit.internal_address}:8080{self.context_path}"
+        return f"{proto}://{self.unit.internal_address}:{PORT}{self.context_path}"
 
     @property
     @override
