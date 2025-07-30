@@ -28,8 +28,8 @@ PORT = 8080
 PROTO = "https"
 SECRET_KEY = "admin-password"
 
-IMAGE_RESOURCE_KEY = "oci-image"
-IMAGE_URI = METADATA["resources"]["oci-image"]["upstream-source"]
+IMAGE_RESOURCE_KEY = "kafka-ui-image"
+IMAGE_URI = METADATA["resources"][IMAGE_RESOURCE_KEY]["upstream-source"]
 
 
 def all_active_idle(status: jubilant.Status, *apps: str):

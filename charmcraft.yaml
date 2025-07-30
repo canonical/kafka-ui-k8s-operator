@@ -12,10 +12,10 @@ assumes:
 
 containers:
   kafka-ui:
-    resource: oci-image
+    resource: kafka-ui-image
 
 resources:
-  oci-image:
+  kafka-ui-image:
     type: oci-image
     description: OCI Image for Kafka UI
     upstream-source: ghcr.io/canonical/charmed-kafka-ui@sha256:b67df704bc08ef16f1ae8c5633c81b07a2c86d0b0163fd5f66d8369728262bc0
