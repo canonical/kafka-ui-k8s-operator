@@ -118,9 +118,6 @@ class Workload(WorkloadBase):
             f"-Dspring.config.additional-location={self.paths.config_dir}/application-local.yml",
             "--add-opens",
             "java.rmi/javax.rmi.ssl=ALL-UNNAMED",
-            "-Xms1G",
-            "-Xmx1G",
-            "-XX:+UseG1GC",
             "-jar",
             "/opt/kafka-ui/libs/api-1.3.0.jar",
         ]
@@ -136,6 +133,9 @@ class Workload(WorkloadBase):
                     "startup": "enabled",
                     "user": USER_NAME,
                     "group": GROUP,
+                    "environment": {
+                        "JAVA_OPTS": "-Xms1G -Xmx1G -XX:+UseG1GC",
+                    },
                 }
             },
         }
