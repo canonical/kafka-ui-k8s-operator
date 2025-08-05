@@ -31,7 +31,7 @@ microk8s enable metallb:$IPADDR-$IPADDR
 Before using Charmed Kafka UI K8s, an Apache Kafka cluster needs to be deployed. The Charmed Apache Kafka K8s operator can be deployed as follows:
 
 ```bash
-juju deploy kafka-k8s --channel 4/edge -n 3 --config roles="broker,controller"
+juju deploy kafka-k8s --channel 4/edge -n 3 --config roles="broker,controller" --trust
 ```
 
 To deploy the Charmed Kafka UI K8s operator and relate it with the Apache Kafka cluster, use the following commands:
@@ -55,7 +55,7 @@ Now, expose the ingress service using the [Traefik K8s Operator](https://charmhu
 
 ```bash
 juju deploy traefik-k8s
-juju relate kafka-ui-k8s traefik-k8s
+juju integrate kafka-ui-k8s traefik-k8s
 ```
 
 Run the `show-proxied-endpoints` Juju Action on the `traefik-k8s` application to get the correct URL:
