@@ -50,7 +50,10 @@ jobs:
       matrix:
         tox-environments:
           - integration
-    name: ${{ matrix.tox-environments }}
+        tls:
+          - "--tls"
+          - ""
+    name: Integration ${{ matrix.tls }}
     needs:
       - lint
       - build
@@ -62,13 +65,18 @@ jobs:
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
-          provider: lxd
+          provider: microk8s
+          channel: "1.28-strict/stable"
           juju-channel: 3.6/stable
           bootstrap-options: "--agent-version 3.6.8"
       - name: Install tools
         run: |
           sudo snap install --classic astral-uv
           uv tool install tox --with tox-uv
+      - name: Enable metallb
+        run: |
+          IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
+          sudo microk8s enable metallb:$IPADDR-$IPADDR
       - name: Download packed charm(s)
         uses: actions/download-artifact@v4
         with:
@@ -86,6 +94,6 @@ jobs:
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' ${{ matrix.tls }}
         env:
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
