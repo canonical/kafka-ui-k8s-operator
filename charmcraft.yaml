@@ -1,12 +1,17 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+#
 type: charm
 name: kafka-ui-k8s
+display-name: Kafka UI K8s
 title: Kafka UI K8s Charm
-summary: A good charm for Kafka UI
 description: |
-  Stuff for the Kafka UI charm
-  Stuff for the Kafka UI charm
-  Stuff for the Kafka UI charm
-  Stuff for the Kafka UI charm
+  Versatile, fast and lightweight web UI for managing Apache Kafka clusters on Kubernetes.
+summary: Charmed Kafka UI K8s Operator
+source: https://github.com/canonical/kafka-ui-k8s-operator
+issues: https://github.com/canonical/kafka-ui-k8s-operator/issues
+maintainers:
+  - Canonical Data Platform <data-platform@lists.launchpad.net>
 assumes:
   - k8s-api
 
