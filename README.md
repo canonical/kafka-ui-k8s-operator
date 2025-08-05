@@ -38,7 +38,7 @@ To deploy the Charmed Kafka UI K8s operator and relate it with the Apache Kafka 
 
 ```bash
 juju deploy kafka-ui-k8s --channel latest/edge
-juju integrate kafka-ui kafka-k8s
+juju integrate kafka-ui-k8s kafka-k8s
 ```
 
 Monitor the deployment via the `juju status` command. Once all the units show as `active|idle`, the Kafka UI is ready to be used.
@@ -46,7 +46,7 @@ Monitor the deployment via the `juju status` command. Once all the units show as
 In order to access the Kafka UI, get the password for the `admin` user with the following command:
 
 ```bash
-juju ssh --container kafka-ui kafka-ui/0 sudo -i 'cat /etc/kafka-ui/application-local.yml' 2>/dev/null | \
+juju ssh --container kafka-ui kafka-ui-k8s/0 'cat /etc/kafka-ui/application-local.yml' 2>/dev/null | \
     yq '.spring.security.user.password' | \
     sed 's/\"//g'
 ```
@@ -68,7 +68,7 @@ Finally, you can now reach the Kafka UI in your browser with the `admin` usernam
 
 ```bash
 URL=${juju run traefik-k8s/leader show-proxied-endpoints | jq '."proxied-endpoints"."kafka-ui-k8s".url'}
-firefox --new-tab https://$IP:8080
+firefox --new-tab https://$URL
 ```
 
 ## Relations
