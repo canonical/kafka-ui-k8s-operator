@@ -3,7 +3,7 @@
 [![Release](https://github.com/canonical/kafka-ui-k8s-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/kafka-ui-k8s-operator/actions/workflows/release.yaml)
 [![Tests](https://github.com/canonical/kafka-ui-k8s-operator/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/canonical/kafka-ui-k8s-operator/actions/workflows/ci.yaml?query=branch%3Amain)
 
-The Charmed Kafka UI K8s Operator delivers automated operations management from day 0 to day 2 on [Kafkbat's Kafka UI](https://github.com/kafbat/kafka-ui-k8s), and enables users to:
+The Charmed Kafka UI K8s Operator delivers automated operations management from day 0 to day 2 on [Kafbat's Kafka UI](https://github.com/kafbat/kafka-ui-k8s), and enables users to:
 
 - View Apache Kafka cluster configuration, topics, ACLs, consumer groups and more
 - Broker performance monitoring via JMX metrics dashboards
@@ -79,7 +79,7 @@ The Charmed Kafka UI Operator supports Juju [relations](https://documentation.ub
 - `kafka_client` (**required**) with Charmed Apache Kafka
 - `karapace_client` integration with Charmed Karapace
 - `connect_client` integration with Charmed Apache Kafka Connect
-- `tls-certificates` interface with any provider charm to manager certificates
+- `tls-certificates` interface with any provider charm to manage certificates
 
 ## Contributing
 
