@@ -14,7 +14,7 @@ from literals import CONTAINER
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
+METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 CONNECT_APP = "kafka-connect-k8s"
 CONNECT_CHANNEL = "latest/edge"
