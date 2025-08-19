@@ -1,0 +1,55 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+#
+name: kafka-ui-k8s
+title: Kafka UI K8s Charm
+description: |
+  Versatile, fast and lightweight web UI for managing Apache Kafka clusters on Kubernetes.
+summary: Charmed Kafka UI K8s Operator
+links:
+  source:
+  - https://github.com/canonical/kafka-ui-k8s-operator
+  issues:
+  - https://github.com/canonical/kafka-ui-k8s-operator/issues
+  website:
+  - https://github.com/kafbat/kafka-ui
+assumes:
+  - k8s-api
+
+containers:
+  kafka-ui:
+    resource: kafka-ui-image
+
+resources:
+  kafka-ui-image:
+    type: oci-image
+    description: OCI Image for Kafka UI
+    upstream-source: ghcr.io/canonical/charmed-kafka-ui@sha256:b67df704bc08ef16f1ae8c5633c81b07a2c86d0b0163fd5f66d8369728262bc0
+
+peers:
+  cluster:
+    interface: cluster
+  restart:
+    interface: rolling_op
+
+requires:
+  kafka-client:
+    interface: kafka_client
+    optional: false
+    limit: 1
+  karapace-client:
+    interface: karapace_client
+    optional: true
+    limit: 1
+  connect-client:
+    interface: connect_client
+    optional: true
+    limit: 1
+  certificates:
+    interface: tls-certificates
+    limit: 1
+    optional: true
+  ingress:
+      interface: ingress
+      limit: 1
+
