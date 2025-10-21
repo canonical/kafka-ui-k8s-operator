@@ -15,6 +15,5 @@ output "endpoints" {
 output "provides_endpoints" {
   description = "Relation endpoints this charm provides"
   value = [
-    "certificates"
   ]
 }
