@@ -10,6 +10,7 @@ from subprocess import PIPE, check_output
 import jubilant
 import yaml
 
+from core.models import AppContext
 from literals import CONTAINER
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,11 @@ KARAPACE_CHANNEL = "latest/edge"
 TLS_APP = "self-signed-certificates"
 TRAEFIK_APP = "traefik-k8s"
 TRAEFIK_CHANNEL = "1.0/stable"
+ADMIN_USER = AppContext.ADMIN_USERNAME
+TEST_SECRET_NAME = "authsecret"
+AUTH_SECRET_CONFIG_KEY = "system-users"
 
+PORT = 8080
 PROTO = "https"
 SECRET_KEY = "admin-password"
 
@@ -67,3 +72,15 @@ def get_unit_ipv4_address(model_full_name: str | None, unit_name: str) -> str | 
         return ipv4_matches[0]
 
     return None
+
+
+def set_password(
+    juju: jubilant.Juju, username: str = ADMIN_USER, password: str = "testpass"
+) -> None:
+    """Use the charm `system-users` config option to start a password rotation."""
+    custom_auth = {username: password, "foo": "bar"}
+    secret_id = juju.add_secret(name=TEST_SECRET_NAME, content=custom_auth)
+    # grant access to our app
+    juju.grant_secret(TEST_SECRET_NAME, app=APP_NAME)
+    # configure the app to use the secret_id
+    juju.config(APP_NAME, values={AUTH_SECRET_CONFIG_KEY: secret_id})

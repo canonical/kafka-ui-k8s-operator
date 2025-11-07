@@ -25,6 +25,7 @@ from helpers import (
     TRAEFIK_CHANNEL,
     all_active_idle,
     get_secret_by_label,
+    set_password,
 )
 
 logger = logging.getLogger(__name__)
@@ -163,3 +164,34 @@ def test_ui(juju: jubilant.Juju, tls_enabled: bool, tmp_path):
     logger.info(f"{clusters_json=}")
     assert len(clusters_json) > 0
     assert clusters_json[0].get("status") == "online"
+
+
+def test_password_rotation(juju: jubilant.Juju, apps: list[str]):
+    secret_data = get_secret_by_label(juju, f"cluster.{APP_NAME}.app", owner=APP_NAME)
+    old_password = secret_data.get(SECRET_KEY)
+
+    new_password = "newStrongPa$$"
+    set_password(juju, password=new_password)
+    assert new_password != old_password
+
+    juju.wait(
+        lambda status: all_active_idle(status, *apps),
+        delay=3,
+        timeout=900,
+        successes=10,
+    )
+
+    # Check we can login with the new password
+    result = juju.run(f"{TRAEFIK_APP}/0", "show-proxied-endpoints")
+    proxied_endpoints = json.loads(result.results.get("proxied-endpoints"))
+    url = proxied_endpoints.get(APP_NAME, {}).get("url")
+    login_resp = requests.post(
+        f"{url}/login",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        data={"username": "admin", "password": new_password},
+        verify=False,
+    )
+
+    assert login_resp.status_code == 200
+    # Successful login would lead to a redirect
+    assert len(login_resp.history) > 0
