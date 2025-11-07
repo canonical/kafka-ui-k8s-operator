@@ -19,8 +19,6 @@ from helpers import (
     KAFKA_CHANNEL,
     KARAPACE_APP,
     KARAPACE_CHANNEL,
-    PORT,
-    PROTO,
     SECRET_KEY,
     TLS_APP,
     TLS_CHANNEL,
@@ -28,7 +26,6 @@ from helpers import (
     TRAEFIK_CHANNEL,
     all_active_idle,
     get_secret_by_label,
-    get_unit_ipv4_address,
     set_password,
 )
 
@@ -186,8 +183,9 @@ def test_password_rotation(juju: jubilant.Juju, apps: list[str]):
     )
 
     # Check we can login with the new password
-    unit_ip = get_unit_ipv4_address(juju.model, f"{APP_NAME}/0")
-    url = f"{PROTO}://{unit_ip}:{PORT}"
+    result = juju.run(f"{TRAEFIK_APP}/0", "show-proxied-endpoints")
+    proxied_endpoints = json.loads(result.results.get("proxied-endpoints"))
+    url = proxied_endpoints.get(APP_NAME, {}).get("url")
     login_resp = requests.post(
         f"{url}/login",
         headers={"Content-Type": "application/x-www-form-urlencoded"},
