@@ -1,6 +1,6 @@
 resource "juju_application" "ui" {
-  model = var.model
-  name  = var.app_name
+  model_uui = var.model_uuid
+  name      = var.app_name
 
   charm {
     name     = "kafka-ui-k8s"
