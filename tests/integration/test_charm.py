@@ -21,6 +21,7 @@ from helpers import (
     KARAPACE_CHANNEL,
     SECRET_KEY,
     TLS_APP,
+    TLS_CHANNEL,
     TRAEFIK_APP,
     TRAEFIK_CHANNEL,
     all_active_idle,
@@ -51,7 +52,7 @@ def test_build_and_deploy(juju: jubilant.Juju, ui_charm: Path, tls_enabled: bool
     juju.deploy(CONNECT_APP, app=CONNECT_APP, trust=True, channel=CONNECT_CHANNEL)
     juju.deploy(KARAPACE_APP, app=KARAPACE_APP, trust=True, channel=KARAPACE_CHANNEL)
     juju.deploy(ui_charm, app=APP_NAME, trust=True, resources={IMAGE_RESOURCE_KEY: IMAGE_URI})
-    juju.deploy(TLS_APP, app=TLS_APP, trust=True)
+    juju.deploy(TLS_APP, app=TLS_APP, channel=TLS_CHANNEL, trust=True)
     juju.deploy(TRAEFIK_APP, app=TRAEFIK_APP, trust=True, channel=TRAEFIK_CHANNEL)
 
     _apps = apps + [TLS_APP, TRAEFIK_APP]
