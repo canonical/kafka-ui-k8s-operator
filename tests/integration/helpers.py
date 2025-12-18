@@ -23,6 +23,7 @@ KAFKA_CHANNEL = "4/edge"
 KARAPACE_APP = "karapace-k8s"
 KARAPACE_CHANNEL = "latest/edge"
 TLS_APP = "self-signed-certificates"
+TLS_CHANNEL = "1/stable"
 TRAEFIK_APP = "traefik-k8s"
 TRAEFIK_CHANNEL = "1.0/stable"
 
