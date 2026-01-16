@@ -115,12 +115,11 @@ class Workload(WorkloadBase):
     @property
     @override
     def layer(self) -> pebble.Layer:
-        truststore_opts = " ".join(
-            [
-                f"-Djavax.net.ssl.trustStore={self.paths.truststore}",
-                f"-Djavax.net.ssl.trustStorePassword={self.truststore_password}",
-            ]
-        )
+        truststore_opts = [
+            f"-Djavax.net.ssl.trustStore={self.paths.truststore}",
+            f"-Djavax.net.ssl.trustStorePassword={self.truststore_password}",
+        ]
+
         jvm_opts = ["-Xms1G", "-Xmx1G", "-XX:+UseG1GC"]
 
         command = [

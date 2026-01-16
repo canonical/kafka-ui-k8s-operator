@@ -22,7 +22,6 @@ from ops.framework import EventBase, EventSource, Object
 
 from core.models import TLSContext
 from literals import SUBSTRATE, TLS_REL
-from managers.tls import generate_private_key
 
 if TYPE_CHECKING:
     from charm import KafkaUiCharm
@@ -88,7 +87,6 @@ class TLSHandler(Object):
                 or self.charm.workload.generate_password(),
                 TLSContext.TRUSTSTORE_PASSWORD: self.charm.context.unit.tls.truststore_password
                 or self.charm.workload.generate_password(),
-                TLSContext.PRIVATE_KEY: generate_private_key().raw,
             }
         )
 
@@ -146,12 +144,15 @@ class TLSHandler(Object):
             event.defer()
             return
 
+        self.init_unit_tls()
+
         certificate = event.certificate.raw
         ca = event.ca.raw
         chain = json.dumps([certificate.raw for certificate in event.chain])
 
         self.charm.context.unit.update(
             {
+                TLSContext.PRIVATE_KEY: self.certificates.private_key.raw,
                 TLSContext.CERT: certificate,
                 TLSContext.CHAIN: chain,
                 TLSContext.CA: ca,
