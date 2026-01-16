@@ -29,7 +29,7 @@ KAFKA_REL = "kafka-client"
 KAFKA_CONNECT_REL = "connect-client"
 KARAPACE_REL = "karapace-client"
 OAUTH_REL = "oauth"
-OAUTH_CLIENT_NAME = "custom"
+OAUTH_CLIENT_NAME = "SSO"
 TLS_REL = "certificates"
 
 Substrates = Literal["vm", "k8s"]

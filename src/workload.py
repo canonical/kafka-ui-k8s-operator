@@ -29,9 +29,11 @@ class Workload(WorkloadBase):
     def __init__(self, container: Container, profile: str = "production") -> None:
         self.container = container
         self.root = pathops.ContainerPath("/", container=container)
+        self.truststore_password: str = ""
 
     @override
-    def start(self) -> None:
+    def start(self, config: dict = {}) -> None:
+        self.truststore_password = config.get("truststore-password", "")
         self.container.add_layer("kafka-ui", self.layer, combine=True)
         self.container.restart(self.service)
 
@@ -40,8 +42,8 @@ class Workload(WorkloadBase):
         self.container.stop(self.service)
 
     @override
-    def restart(self) -> None:
-        self.start()
+    def restart(self, config: dict = {}) -> None:
+        self.start(config=config)
 
     @override
     def read(self, path: str) -> list[str]:
@@ -113,9 +115,19 @@ class Workload(WorkloadBase):
     @property
     @override
     def layer(self) -> pebble.Layer:
+        truststore_opts = " ".join(
+            [
+                f"-Djavax.net.ssl.trustStore={self.paths.truststore}",
+                f"-Djavax.net.ssl.trustStorePassword={self.truststore_password}",
+            ]
+        )
+        jvm_opts = ["-Xms1G", "-Xmx1G", "-XX:+UseG1GC"]
+
         command = [
             "java",
             f"-Dspring.config.additional-location={self.paths.config_dir}/application-local.yml",
+            *jvm_opts,
+            *truststore_opts,
             "--add-opens",
             "java.rmi/javax.rmi.ssl=ALL-UNNAMED",
             "-jar",
@@ -133,14 +145,10 @@ class Workload(WorkloadBase):
                     "startup": "enabled",
                     "user": USER_NAME,
                     "group": GROUP,
-                    "environment": {
-                        "JAVA_OPTS": "-Xms1G -Xmx1G -XX:+UseG1GC",
-                    },
                 }
             },
         }
         return pebble.Layer(layer_config)
-        raise NotImplementedError
 
     @override
     def set_environment(self, env_vars: Iterable[str]) -> None:

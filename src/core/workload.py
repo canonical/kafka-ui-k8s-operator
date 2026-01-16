@@ -49,7 +49,7 @@ class WorkloadBase(ABC):
     root: pathops.PathProtocol
 
     @abstractmethod
-    def start(self) -> None:
+    def start(self, config: dict = {}) -> None:
         """Start the workload service."""
         ...
 
@@ -59,7 +59,7 @@ class WorkloadBase(ABC):
         ...
 
     @abstractmethod
-    def restart(self) -> None:
+    def restart(self, config: dict = {}) -> None:
         """Restart the workload service."""
         ...
 

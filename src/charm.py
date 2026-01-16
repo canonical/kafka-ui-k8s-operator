@@ -73,7 +73,6 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
         self.tls = TLSHandler(self)
         self.user_secrets = SecretsHandler(self)
 
-        self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.update_status, self._on_update_status)
@@ -125,7 +124,9 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
         if self.context.oauth_relation:
             self.oauth.update_client_config(self.oauth_config)
 
-        self.workload.restart()
+        self.workload.restart(
+            config={"truststore-password": self.context.unit.tls.truststore_password}
+        )
 
     def _on_update_status(self, _) -> None:
         """Handle `update-status` event."""

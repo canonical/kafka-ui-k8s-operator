@@ -97,6 +97,9 @@ class ConfigManager:
                         "issuer-uri": self.context.oauth.issuer_url,
                         "jwk-set-uri": self.context.oauth.jwks_endpoint,
                         "user-name-attribute": self.config.username_attribute,
+                        "custom-params": {
+                            "type": "oauth",
+                        },
                     }
                 }
             },
