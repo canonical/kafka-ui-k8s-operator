@@ -52,4 +52,7 @@ requires:
   ingress:
       interface: ingress
       limit: 1
-
+  oauth:
+    interface: oauth
+    limit: 1
+    optional: true
