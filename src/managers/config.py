@@ -19,7 +19,7 @@ ADMIN_PERMISSIONS = [
     {"resource": "schema", "value": ".*", "actions": "all"},
     {"resource": "connect", "value": ".*", "actions": "all"},
     {"resource": "ksql", "actions": "all"},
-    {"resource": "acl", "actions": ["view"]},
+    {"resource": "acl", "actions": ["view", "edit"]},
 ]
 
 ROLE_PERMISSION_MAPPING = {"admin": ADMIN_PERMISSIONS}
@@ -91,7 +91,7 @@ class ConfigManager:
                         "provider": "hydra",
                         "clientId": self.context.oauth.client_id,
                         "clientSecret": self.context.oauth.client_secret,
-                        "scope": "openid",
+                        "scope": ["email", "openid", "profile"],
                         "client-name": OAUTH_CLIENT_NAME,
                         "authorization-grant-type": "authorization_code",
                         "issuer-uri": self.context.oauth.issuer_url,
