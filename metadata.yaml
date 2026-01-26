@@ -32,6 +32,11 @@ peers:
   restart:
     interface: rolling_op
 
+provides:
+  extra-roles:
+    interface: kafka_client
+    optional: true
+
 requires:
   kafka-client:
     interface: kafka_client

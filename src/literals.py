@@ -25,6 +25,7 @@ PORT = 8080
 
 DEFAULT_SECURITY_MECHANISM = "SCRAM-SHA-512"
 PEER_REL = "cluster"
+CLIENT_REL = "extra-roles"
 KAFKA_REL = "kafka-client"
 KAFKA_CONNECT_REL = "connect-client"
 KARAPACE_REL = "karapace-client"

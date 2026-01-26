@@ -5,9 +5,10 @@
 """Context and data model definitions."""
 
 import json
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import MutableMapping
+from typing import Literal, MutableMapping
 
 from charms.data_platform_libs.v0.data_interfaces import (
     PLUGIN_URL_NOT_REQUIRED,
@@ -21,9 +22,11 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from ops import Object
 from ops.model import Application, Relation, RelationDataAccessError, Unit
-from typing_extensions import TYPE_CHECKING, override
+from pydantic import BaseModel, ValidationError, model_validator
+from typing_extensions import TYPE_CHECKING, Self, override
 
 from literals import (
+    CLIENT_REL,
     DEFAULT_SECURITY_MECHANISM,
     KAFKA_CONNECT_REL,
     KAFKA_REL,
@@ -38,6 +41,9 @@ from literals import (
 
 if TYPE_CHECKING:
     from charm import KafkaUiCharm
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -424,6 +430,113 @@ class OAuthContext:
         return self.relation_data.get("jwt_access_token", "false").lower() == "true"
 
 
+UPSTREAM_PERMISSION_MODEL = {
+    "applicationconfig": ["view", "edit"],
+    "clusterconfig": ["view", "edit"],
+    "topic": [
+        "view",
+        "create",
+        "edit",
+        "delete",
+        "messages_read",
+        "messages_produce",
+        "messages_delete",
+        "analysis_run",
+        "analysis_view",
+    ],
+    "consumer": ["view", "delete", "reset_offsets"],
+    "schema": ["view", "create", "delete", "edit", "modify_global_compatibility"],
+    "connect": [
+        "view",
+        "edit",
+        "create",
+        "delete",
+        "operate",
+        "reset_offsets",
+    ],  # applies to all connectors in a connect cluster
+    "connector": [
+        "view",
+        "edit",
+        "create",
+        "delete",
+        "operate",
+        "reset_offsets",
+    ],  # granular per-connector permissions (value format: connectName/connectorName)
+    "acl": ["view", "edit"],
+    "audit": ["view"],
+}
+
+
+class EntityPermissionModel(BaseModel):
+    """Entity Permissions Model."""
+
+    resource_type: Literal[
+        "applicationconfig",
+        "clusterconfig",
+        "topic",
+        "consumer",
+        "schema",
+        "connect",
+        "connector",
+        "acl",
+        "audit",
+    ]
+    resource_name: str
+    privileges: list[str]
+
+    @model_validator(mode="after")
+    def check_consistency(self) -> Self:
+        """Check consistency of requested permissions for given resource_type."""
+        allowed_privileges = set(UPSTREAM_PERMISSION_MODEL.get(self.resource_type))
+        requested_privileges = {p.lower() for p in self.privileges}
+        if disallowed := requested_privileges - allowed_privileges:
+            raise ValueError(
+                f"Following privileges are not allowed for "
+                f"resource_type {self.resource_type}: {','.join(disallowed)}"
+            )
+
+        return self
+
+
+class RoleRequestContext(RelationContext):
+    """State collection metadata for a single related client application."""
+
+    def __init__(
+        self,
+        relation: Relation | None,
+        data_interface: Data,
+        component: Application,
+        local_app: Application | None = None,
+    ):
+        super().__init__(relation, data_interface, component, None)
+        self.app = component
+        self.local_app = local_app
+
+    @property
+    def username(self) -> str:
+        """The generated username for the client application."""
+        return f"relation-{getattr(self.relation, 'id', '')}"
+
+    @property
+    def topic(self) -> str:
+        """The requested topic for the client."""
+        return self.relation_data.get("topic", "")
+
+    @property
+    def permissions(self) -> list[EntityPermissionModel]:
+        """List of permissions requested by the client."""
+        if not (raw_request := self.relation_data.get("entity-permissions", "")):
+            return []
+
+        try:
+            request = json.loads(raw_request)
+            return [EntityPermissionModel(**p) for p in request]
+        except (ValidationError, json.JSONDecodeError) as e:
+            # TODO: propagate the error to the client.
+            logger.error(f"Permissions requested by the client is invalid: {e}")
+            return []
+
+
 class AppContext(RelationContext):
     """Context collection metadata for Kafka UI peer relation."""
 
@@ -554,6 +667,11 @@ class Context(WithStatus, Object):
         return self.model.get_relation(OAUTH_REL)
 
     @property
+    def client_relations(self) -> set[Relation]:
+        """The relations of all client applications."""
+        return set(self.model.relations[CLIENT_REL])
+
+    @property
     def oauth(self) -> OAuthContext:
         """The OAuth relation context."""
         return OAuthContext(self.model, self.oauth_relation)
@@ -598,6 +716,25 @@ class Context(WithStatus, Object):
         """Returns the UI web server endpoint."""
         proto = "http" if SUBSTRATE == "k8s" else "https"
         return f"{proto}://{self.unit.internal_address}:{PORT}{self.context_path}"
+
+    @property
+    def clients(self) -> set[RoleRequestContext]:
+        """The state for all related client Applications."""
+        clients = set()
+        for relation in self.client_relations:
+            if not relation.app:
+                continue
+
+            clients.add(
+                RoleRequestContext(
+                    relation=relation,
+                    data_interface=self.client_provider_interface,
+                    component=relation.app,
+                    local_app=self.model.app,
+                )
+            )
+
+        return clients
 
     @property
     @override
