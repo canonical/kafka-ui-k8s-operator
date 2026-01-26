@@ -130,7 +130,7 @@ class Workload(WorkloadBase):
             "--add-opens",
             "java.rmi/javax.rmi.ssl=ALL-UNNAMED",
             "-jar",
-            "/opt/kafka-ui/libs/api-1.3.0.jar",
+            "/opt/kafka-ui/libs/api-1.4.2.jar",
         ]
 
         layer_config: pebble.LayerDict = {
