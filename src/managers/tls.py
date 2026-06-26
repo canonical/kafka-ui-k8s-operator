@@ -4,6 +4,7 @@
 
 """Manager for handling TLS configuration."""
 
+import hashlib
 import logging
 import re
 import socket
@@ -26,7 +27,7 @@ from ops.pebble import ExecError
 
 from core.models import Context, GeneratedCa, SelfSignedCertificate, TLSContext, UnitContext
 from core.workload import WorkloadBase
-from literals import GROUP, SNAP_NAME, USER_NAME, Substrates
+from literals import GROUP, JAVA_CACERTS_PASSWORD, OAUTH_CA_ALIAS_PREFIX, SNAP_NAME, USER_NAME, Substrates
 
 logger = logging.getLogger(__name__)
 
@@ -201,8 +202,17 @@ class TLSManager:
             logger.error(e.stdout)
             raise e
 
-    def import_cert(self, alias: str, filename: str, cert_content: str | None = None) -> None:
-        """Add a certificate to the truststore."""
+    def import_cert(
+        self,
+        alias: str,
+        filename: str,
+        cert_content: str | None = None,
+        keystore: str | None = None,
+        storepass: str | None = None,
+    ) -> None:
+        """Add a certificate to a truststore (defaults to the unit JKS truststore)."""
+        keystore = keystore or self.workload.paths.truststore
+        storepass = storepass or self.tls_context.truststore_password
         if cert_content:
             self.workload.write(
                 content=cert_content, path=f"{self.workload.paths.config_dir}/{filename}"
@@ -216,9 +226,9 @@ class TLSManager:
             "-file",
             filename,
             "-keystore",
-            self.workload.paths.truststore,
+            keystore,
             "-storepass",
-            self.tls_context.truststore_password,
+            storepass,
             "-noprompt",
         ]
         try:
@@ -231,8 +241,12 @@ class TLSManager:
             logger.error(e.stdout)
             raise e
 
-    def remove_cert(self, alias: str) -> None:
-        """Remove a cert from the truststore."""
+    def remove_cert(
+        self, alias: str, keystore: str | None = None, storepass: str | None = None
+    ) -> None:
+        """Remove a cert from a truststore (defaults to the unit JKS truststore)."""
+        keystore = keystore or self.workload.paths.truststore
+        storepass = storepass or self.tls_context.truststore_password
         command = [
             self.keytool,
             "-delete",
@@ -240,9 +254,9 @@ class TLSManager:
             "-alias",
             alias,
             "-keystore",
-            self.workload.paths.truststore,
+            keystore,
             "-storepass",
-            self.tls_context.truststore_password,
+            storepass,
             "-noprompt",
         ]
         try:
@@ -351,18 +365,21 @@ class TLSManager:
         self.set_truststore()
         self.set_keystore()
 
-    def get_trusted_certificates(self, truststore_path: str) -> dict[str, bytes]:
+    def get_trusted_certificates(
+        self, truststore_path: str, storepass: str | None = None
+    ) -> dict[str, bytes]:
         """Return a mapping of alias to certificate fingerprint (hash) for a given truststore."""
         if not (self.workload.root / truststore_path).exists():
             return {}
 
+        storepass = storepass or self.tls_context.truststore_password
         command = [
             self.keytool,
             "-list",
             "-keystore",
             truststore_path,
             "-storepass",
-            self.tls_context.truststore_password,
+            storepass,
             "-noprompt",
         ]
         raw = self.workload.exec(command=command, working_dir=self.workload.paths.config_dir)
@@ -389,6 +406,48 @@ class TLSManager:
                 alias = client.relation.name
                 self.remove_cert(alias)
                 self.import_cert(alias=alias, filename=f"{alias}.pem", cert_content=client.tls_ca)
+
+    def set_oauth_truststore(self, certificates: set[str]) -> None:
+        """Reconcile the JVM default truststore to trust exactly the given OAuth CAs.
+
+        Aliases are based on content (`oauth-ca-<sha256(pem)[:16]>`).
+        """
+        desired = {self.oauth_ca_alias(cert): cert for cert in certificates}
+
+        current_aliases = {
+            alias
+            for alias in self.get_trusted_certificates(
+                self.workload.paths.java_truststore, storepass=JAVA_CACERTS_PASSWORD
+            )
+            if alias.startswith(OAUTH_CA_ALIAS_PREFIX)
+        }
+
+        for alias in current_aliases - set(desired):
+            self.remove_cert(
+                alias,
+                keystore=self.workload.paths.java_truststore,
+                storepass=JAVA_CACERTS_PASSWORD,
+            )
+
+        for alias in set(desired) - current_aliases:
+            self.import_cert(
+                alias=alias,
+                filename=f"{alias}.pem",
+                cert_content=desired[alias],
+                keystore=self.workload.paths.java_truststore,
+                storepass=JAVA_CACERTS_PASSWORD,
+            )
+
+        self.workload.exec(
+            f"chown {USER_NAME}:{GROUP} {self.workload.paths.java_truststore}".split()
+        )
+        self.workload.exec(["chmod", "770", self.workload.paths.java_truststore])
+
+    @staticmethod
+    def oauth_ca_alias(certificate: str) -> str:
+        """Return a deterministic, content-derived truststore alias for an OAuth CA."""
+        digest = hashlib.sha256(certificate.encode("utf-8")).hexdigest()[:16]
+        return f"{OAUTH_CA_ALIAS_PREFIX}{digest}"
 
     @staticmethod
     def certificate_fingerprint(cert: str):

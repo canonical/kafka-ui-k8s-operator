@@ -17,6 +17,8 @@ requests = ">=2.32.4"
 [tool.poetry.group.charm-libs.dependencies]
 # data_platform_libs/v0/data_interfaces.py
 ops = ">=2.0.0"
+# hydra/v0/oauth.py
+jsonschema = "^4.24.0"
 
 [tool.poetry.group.fmt]
 optional = true

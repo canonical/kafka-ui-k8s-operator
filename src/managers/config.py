@@ -43,14 +43,16 @@ class ConfigManager:
             return {}
 
         return {
-            "ssl": {
-                "bundle": {
-                    "jks": {
-                        "server": {
-                            "keystore": {
-                                "location": self.workload.paths.keystore,
-                                "password": self.context.unit.tls.keystore_password,
-                                "type": "PKCS12",
+            "spring": {
+                "ssl": {
+                    "bundle": {
+                        "jks": {
+                            "server": {
+                                "keystore": {
+                                    "location": self.workload.paths.keystore,
+                                    "password": self.context.unit.tls.keystore_password,
+                                    "type": "PKCS12",
+                                }
                             }
                         }
                     }
@@ -59,7 +61,7 @@ class ConfigManager:
         }
 
     @property
-    def basic_auth_and_tls_config(self) -> dict:
+    def basic_auth(self) -> dict:
         """Return basic auth & TLS config for the Spring Boot application."""
         return {
             "auth": {"type": "LOGIN_FORM"},
@@ -70,9 +72,48 @@ class ConfigManager:
                         "password": self.context.app.admin_password,
                     }
                 }
-            }
-            | self.spring_boot_tls_config,
+            },
         }
+
+    @property
+    def oauth_config(self) -> dict:
+        """Return OAuth config for the Spring Boot application."""
+        if not self.context.oauth_relation:
+            return {}
+
+        return {
+            "auth": {
+                "type": "OAUTH2",
+                "oauth2": {
+                    "client": {
+                        "iam": {
+                            "clientId": self.context.oauth_client.client_id,
+                            "clientSecret": self.context.oauth_client.client_secret,
+                            "scope": ["openid", "email"],
+                            "client-name": "iam",
+                            "provider": "iam",
+                            "redirect-uri": f"{self.context.ingress_url}/login/oauth2/code/iam",
+                            "authorization-grant-type": "authorization_code",
+                            "issuer-uri": self.context.oauth_client.issuer_url,
+                            "user-name-attribute": self.config.username_attribute,
+                            # "custom-params": {
+                            # fill this if you're gonna use RBAC. Supported values: cognito,
+                            # google, github, oauth (for other generic providers)
+                            #     "type": "<provider_type>",
+                            # required for RBAC, a field name in OAuth token which will
+                            # contain user's roles/groups
+                            #     "roles-field": "groups"
+                            # }
+                        }
+                    }
+                },
+            }
+        }
+
+    @property
+    def auth_config(self) -> dict:
+        """Return auth config for the Spring Boot application."""
+        return self.oauth_config if self.context.oauth_relation else self.basic_auth
 
     @property
     def webclient_config(self) -> dict:
@@ -190,13 +231,19 @@ class ConfigManager:
     @property
     def application_local_config(self) -> dict:
         """Return the final application configuration object."""
-        return (
+        config = (
             self.kafka_cluster_config
+            | self.auth_config
             | self.monitoring_config
-            | self.basic_auth_and_tls_config
             | self.webclient_config
             | self.server_config
         )
+
+        # 'security' and 'ssl' both live under the 'spring' key
+        if spring := config.get("spring", {}) | self.spring_boot_tls_config.get("spring", {}):
+            config["spring"] = spring
+
+        return config
 
     @property
     def clean_yaml_config(self) -> str:

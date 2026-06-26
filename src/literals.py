@@ -22,13 +22,17 @@ CONFIG_DIR = "/etc/kafka-ui"
 SUBSTRATE = "k8s"
 PORT = 8080
 
-
 DEFAULT_SECURITY_MECHANISM = "SCRAM-SHA-512"
 PEER_REL = "cluster"
 KAFKA_REL = "kafka-client"
 KAFKA_CONNECT_REL = "connect-client"
 KARAPACE_REL = "karapace-client"
 TLS_REL = "certificates"
+OAUTH_REL = "oauth"
+OAUTH_CA_REL = "oauth-ca"
+
+OAUTH_CA_ALIAS_PREFIX = "oauth-ca-"
+JAVA_CACERTS_PASSWORD = "changeit"
 
 Substrates = Literal["vm", "k8s"]
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
