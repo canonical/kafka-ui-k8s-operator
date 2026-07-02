@@ -34,6 +34,22 @@ OAUTH_CA_REL = "oauth-ca"
 OAUTH_CA_ALIAS_PREFIX = "oauth-ca-"
 JAVA_CACERTS_PASSWORD = "changeit"
 
+CLUSTER_NAME = "kafka"
+RBAC_SUBJECT_PROVIDER = "oauth"
+ADMIN_ROLE = "admin"
+
+ADMIN_PERMISSIONS = [
+    {"resource": "applicationconfig", "actions": "view"},
+    {"resource": "clusterconfig", "actions": "view"},
+    {"resource": "topic", "value": ".*", "actions": "all"},
+    {"resource": "consumer", "value": ".*", "actions": "all"},
+    {"resource": "schema", "value": ".*", "actions": "all"},
+    {"resource": "connect", "value": ".*", "actions": "all"},
+    {"resource": "acl", "actions": ["view", "edit"]},
+]
+
+ROLE_PERMISSIONS = {ADMIN_ROLE: ADMIN_PERMISSIONS}
+
 Substrates = Literal["vm", "k8s"]
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 

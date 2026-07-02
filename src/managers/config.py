@@ -4,12 +4,16 @@
 
 """Manager for handling Kafka UI app configuration."""
 
+import logging
+
 import yaml
 
 from core.models import Context
 from core.structured_config import CharmConfig
 from core.workload import WorkloadBase
-from literals import SUBSTRATE
+from literals import CLUSTER_NAME, RBAC_SUBJECT_PROVIDER, ROLE_PERMISSIONS, SUBSTRATE
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
@@ -96,19 +100,37 @@ class ConfigManager:
                             "authorization-grant-type": "authorization_code",
                             "issuer-uri": self.context.oauth_client.issuer_url,
                             "user-name-attribute": self.config.username_attribute,
-                            # "custom-params": {
-                            # fill this if you're gonna use RBAC. Supported values: cognito,
-                            # google, github, oauth (for other generic providers)
-                            #     "type": "<provider_type>",
-                            # required for RBAC, a field name in OAuth token which will
-                            # contain user's roles/groups
-                            #     "roles-field": "groups"
-                            # }
+                            "custom-params": {"type": RBAC_SUBJECT_PROVIDER},
                         }
                     }
                 },
             }
         }
+
+    @property
+    def rbac_config(self) -> dict:
+        """Return the Kafka UI RBAC config built from roles-mapping."""
+        mapping = self.config.roles_mapping or {}
+        if not self.context.oauth_relation or not mapping:
+            return {}
+
+        roles = []
+        for role, permissions in ROLE_PERMISSIONS.items():
+            subjects = [
+                {"provider": RBAC_SUBJECT_PROVIDER, "type": "user", "value": user}
+                for user, mapped_role in mapping.items()
+                if mapped_role == role
+            ]
+            if subjects:
+                roles.append(
+                    {
+                        "name": role,
+                        "clusters": [CLUSTER_NAME],
+                        "subjects": subjects,
+                        "permissions": permissions,
+                    }
+                )
+        return {"rbac": {"roles": roles}} if roles else {}
 
     @property
     def auth_config(self) -> dict:
@@ -188,7 +210,7 @@ class ConfigManager:
             "kafka": {
                 "clusters": [
                     {
-                        "name": "kafka",
+                        "name": CLUSTER_NAME,
                         "bootstrap-servers": self.context.kafka_client.bootstrap_servers,
                         **self.cluster_tls_properties,
                         "properties": self.kafka_client_properties_config,
@@ -197,7 +219,7 @@ class ConfigManager:
                         or None,
                         "schema-registry-auth": self.schema_registry_auth_config,
                         "metrics": {"type": "PROMETHEUS", "port": 9101},
-                        "read-only": True,
+                        "read-only": False if self.context.oauth_relation else True,
                         "polling-throttle-rate": 30,
                         "consumer-properties": {"max.partition.fetch.bytes": 104857600},
                     }
@@ -234,6 +256,7 @@ class ConfigManager:
         config = (
             self.kafka_cluster_config
             | self.auth_config
+            | self.rbac_config
             | self.monitoring_config
             | self.webclient_config
             | self.server_config

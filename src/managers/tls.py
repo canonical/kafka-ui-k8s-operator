@@ -27,7 +27,14 @@ from ops.pebble import ExecError
 
 from core.models import Context, GeneratedCa, SelfSignedCertificate, TLSContext, UnitContext
 from core.workload import WorkloadBase
-from literals import GROUP, JAVA_CACERTS_PASSWORD, OAUTH_CA_ALIAS_PREFIX, SNAP_NAME, USER_NAME, Substrates
+from literals import (
+    GROUP,
+    JAVA_CACERTS_PASSWORD,
+    OAUTH_CA_ALIAS_PREFIX,
+    SNAP_NAME,
+    USER_NAME,
+    Substrates,
+)
 
 logger = logging.getLogger(__name__)
 
