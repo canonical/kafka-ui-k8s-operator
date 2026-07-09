@@ -28,19 +28,6 @@ TLS_CHANNEL = "1/stable"
 TRAEFIK_APP = "traefik-k8s"
 TRAEFIK_CHANNEL = "1.0/stable"
 HYDRA_APP = "hydra"
-KRATOS_EXTERNAL_IDP_INTEGRATOR = "kratos-external-idp-integrator"
-IDENTITY_APPS = [
-    "hydra",
-    "kratos",
-    "kratos-external-idp-integrator",
-    "identity-platform-login-ui-operator",
-    "postgresql-k8s",
-    "self-signed-certificates",
-    "traefik-admin",
-    "traefik-public",
-]
-# Spring Security endpoint the Kafka UI login page links to for the `iam` provider.
-OAUTH_AUTHORIZATION_PATH = "/oauth2/authorization/iam"
 ADMIN_USER = AppContext.ADMIN_USERNAME
 TEST_SECRET_NAME = "authsecret"
 AUTH_SECRET_CONFIG_KEY = "system-users"
