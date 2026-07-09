@@ -5,7 +5,6 @@
 import asyncio
 import json
 import logging
-import re
 from pathlib import Path
 
 import pytest
