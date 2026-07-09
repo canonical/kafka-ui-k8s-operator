@@ -20,13 +20,13 @@ from helpers import (
     TRAEFIK_CHANNEL,
 )
 from oauth_tools import (
-    DexIdpService,
     access_application_login_page,
     click_on_sign_in_button_by_text,
     complete_auth_code_login,
     deploy_identity_bundle,
     get_cookies_from_browser_by_url,
 )
+from oauth_tools.external_idp import DexIdpService
 from playwright.async_api._generated import BrowserContext, Page
 from pytest_operator.plugin import OpsTest
 
