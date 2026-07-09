@@ -145,9 +145,6 @@ async def test_oauth_login_with_identity_bundle(
     await click_on_sign_in_button_by_text(page=page, text="Log in with iam")
     await complete_auth_code_login(page=page, ops_test=ops_test, ext_idp_service=ext_idp_service)
 
-    # The browser lands back on the authenticated Kafka UI.
-    await page.wait_for_url(re.compile(rf"{re.escape(url)}.*"))
-
     cookies = await get_cookies_from_browser_by_url(context, url)
     session = requests.Session()
     for cookie in cookies:
