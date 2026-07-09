@@ -47,11 +47,12 @@ jobs:
       fail-fast: false
       matrix:
         tox-environments:
-          - integration
+          - integration-charm
+          - integration-oauth
         tls:
           - "--tls"
           - ""
-    name: Integration ${{ matrix.tls }}
+    name: ${{ matrix.tox-environments }} ${{ matrix.tls }}
     needs:
       - lint
       - build
