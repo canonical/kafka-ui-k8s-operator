@@ -14,17 +14,6 @@ import pytest
 def pytest_addoption(parser):
     """Define pytest parsers."""
     parser.addoption(
-        "--model",
-        action="store",
-        help="Juju model to use; if not provided, a new model "
-        "will be created for each test which requires one",
-    )
-    parser.addoption(
-        "--keep-models",
-        action="store_true",
-        help="Keep models handled by opstest, can be overridden in track_model",
-    )
-    parser.addoption(
         "--tls",
         action="store_true",
         help="Whether to use TLS on tests or not",
