@@ -54,7 +54,8 @@ async def test_build_and_deploy(
     self_signed_certificates_app_name: str,
     ext_idp_service: DexIdpService,
 ):
-    # `ext_idp_service` will deploy an external idp to use for loggining in and manage it's lifecycle
+    # `ext_idp_service` will deploy an external idp to use for
+    # logging in and manage its lifecycle
 
     # Deploy the identity bundle
     await deploy_identity_bundle(
@@ -74,7 +75,7 @@ async def test_build_and_deploy(
             application_name=APP_NAME,
             trust=True,
             resources={IMAGE_RESOURCE_KEY: IMAGE_URI},
-            config={"roles-mapping": f'{{"{TEST_EMAIL}": "admin"}}'}
+            config={"roles-mapping": f'{{"{TEST_EMAIL}": "admin"}}'},
         ),
         ops_test.model.deploy(
             TRAEFIK_APP,
@@ -96,7 +97,9 @@ async def test_build_and_deploy(
     await ops_test.model.integrate(f"{KAFKA_APP}:certificates", self_signed_certificates_app_name)
     await ops_test.model.integrate(f"{APP_NAME}:certificates", self_signed_certificates_app_name)
 
-    await ops_test.model.integrate(f"{TRAEFIK_UI_APP}:certificates", self_signed_certificates_app_name)
+    await ops_test.model.integrate(
+        f"{TRAEFIK_UI_APP}:certificates", self_signed_certificates_app_name
+    )
     await ops_test.model.integrate(f"{APP_NAME}:ingress", TRAEFIK_UI_APP)
 
     await ops_test.model.wait_for_idle(
@@ -125,8 +128,10 @@ async def test_oauth_login_with_identity_bundle(
     ext_idp_service: DexIdpService,
 ) -> None:
     # Fetch the Kafka UI's URL
-    action = await ops_test.model.applications[TRAEFIK_UI_APP].units[0].run_action(
-        "show-proxied-endpoints"
+    action = (
+        await ops_test.model.applications[TRAEFIK_UI_APP]
+        .units[0]
+        .run_action("show-proxied-endpoints")
     )
     result = await action.wait()
     proxied_endpoints = json.loads(result.results["proxied-endpoints"])
@@ -138,9 +143,7 @@ async def test_oauth_login_with_identity_bundle(
         page=page, url=url, redirect_login_url=f"{url}/auth/openid/login"
     )
     await click_on_sign_in_button_by_text(page=page, text="Log in with iam")
-    await complete_auth_code_login(
-        page=page, ops_test=ops_test, ext_idp_service=ext_idp_service
-    )
+    await complete_auth_code_login(page=page, ops_test=ops_test, ext_idp_service=ext_idp_service)
 
     # The browser lands back on the authenticated Kafka UI.
     await page.wait_for_url(re.compile(rf"{re.escape(url)}.*"))
