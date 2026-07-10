@@ -138,9 +138,7 @@ async def test_oauth_login_with_identity_bundle(
     if not url:
         raise Exception("Can't retrieve proxied endpoint for Kafka UI.")
 
-    await access_application_login_page(
-        page=page, url=url, redirect_login_url=url,
-    )
+    await access_application_login_page(page=page, url=url, redirect_login_url=url)
     await click_on_sign_in_button_by_text(page=page, text="Log in with iam")
     await complete_auth_code_login(page=page, ops_test=ops_test, ext_idp_service=ext_idp_service)
 
