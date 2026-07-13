@@ -5,24 +5,29 @@
 import asyncio
 import json
 import logging
-from pathlib import Path
+import re
 
+import jubilant
 import pytest
 import requests
 from helpers import (
     APP_NAME,
+    IAM_APPS,
+    IAM_MODEL,
     IMAGE_RESOURCE_KEY,
     IMAGE_URI,
     KAFKA_APP,
     KAFKA_CHANNEL,
+    KRATOS_EXTERNAL_IDP_INTEGRATOR_APP,
+    TLS_APP,
+    TLS_CHANNEL,
     TRAEFIK_APP,
     TRAEFIK_CHANNEL,
+    TerraformDeployer,
+    all_active_idle,
 )
 from oauth_tools import (
     access_application_login_page,
-    click_on_sign_in_button_by_text,
-    complete_auth_code_login,
-    deploy_identity_bundle,
     get_cookies_from_browser_by_url,
 )
 from oauth_tools.external_idp import DexIdpService
@@ -36,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 TRAEFIK_UI_APP = "traefik-ui"
 TEST_EMAIL = "admin@example.com"
+DEX_PROVIDER_ID = "Dex"
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -45,22 +51,67 @@ def _require_tls(request: pytest.FixtureRequest):
         pytest.skip("OAuth login requires TLS; run with --tls")
 
 
+@pytest.fixture(scope="module")
+def iam_deployer(ops_test: OpsTest):
+    """Own the lifecycle of the terraform-managed identity platform."""
+    deployer = TerraformDeployer()
+    deployer.cleanup()
+    yield deployer
+
+
+async def _cross_model_integrate(
+    ops_test: OpsTest, offer_url: str, endpoint: str, saas_alias: str
+) -> None:
+    """Consume a cross-model offer and integrate it into the test model."""
+    model = ops_test.model_full_name
+    await ops_test.run("juju", "consume", "-m", model, offer_url, saas_alias, check=True)
+    await ops_test.run("juju", "integrate", "-m", model, endpoint, saas_alias, check=True)
+
+
+async def _complete_dex_login(page: Page, ext_idp_service: DexIdpService) -> None:
+    """From the identity-platform login UI, log in through the external Dex IdP."""
+    async with page.expect_navigation():
+        await page.get_by_role("button", name=DEX_PROVIDER_ID).click()
+
+    await ext_idp_service.complete_user_login(page)
+
+
 async def test_build_and_deploy(
     ops_test: OpsTest,
-    ui_charm: Path,
-    hydra_app_name: str,
-    public_traefik_app_name: str,
-    self_signed_certificates_app_name: str,
+    ui_charm,
     ext_idp_service: DexIdpService,
+    iam_deployer: TerraformDeployer,
 ):
-    # `ext_idp_service` will deploy an external idp to use for
-    # logging in and manage its lifecycle
+    tfvars = iam_deployer.create_tfvars(
+        {
+            "idp_client_id": ext_idp_service.client_id,
+            "idp_client_secret": ext_idp_service.client_secret,
+            "idp_issuer_url": ext_idp_service.issuer_url,
+            "idp_provider_id": DEX_PROVIDER_ID,
+        }
+    )
+    iam_deployer.init()
+    iam_deployer.apply(tfvars)
+    outputs = iam_deployer.output()
 
-    # Deploy the identity bundle
-    await deploy_identity_bundle(
-        ops_test=ops_test, bundle_channel="latest/edge", ext_idp_service=ext_idp_service
+    iam_juju = jubilant.Juju(model=IAM_MODEL)
+    iam_juju.wait(
+        lambda status: all_active_idle(status, *IAM_APPS),
+        delay=10,
+        successes=3,
+        timeout=2000,
     )
 
+    # Register Kratos's OIDC callback URI on the external IdP (Dex). Kratos is an
+    # OIDC client of Dex, which rejects the login unless this redirect URI is in
+    # its allow-list. The URI depends on traefik-public's runtime ingress URL, so
+    # it can only be fetched (via the integrator's get-redirect-uri action) and
+    # registered on Dex after the identity platform is up.
+    logger.info("Registering the redirect URI on the external provider")
+    task = iam_juju.run(f"{KRATOS_EXTERNAL_IDP_INTEGRATOR_APP}/0", "get-redirect-uri")
+    ext_idp_service.update_redirect_uri(redirect_uri=task.results["redirect-uri"])
+
+    # Deploy KafkaUI
     await asyncio.gather(
         ops_test.model.deploy(
             KAFKA_APP,
@@ -82,6 +133,12 @@ async def test_build_and_deploy(
             channel=TRAEFIK_CHANNEL,
             trust=True,
         ),
+        ops_test.model.deploy(
+            TLS_APP,
+            application_name=TLS_APP,
+            channel=TLS_CHANNEL,
+            trust=True,
+        ),
     )
 
     await ops_test.model.wait_for_idle(
@@ -93,26 +150,28 @@ async def test_build_and_deploy(
     )
 
     await ops_test.model.integrate(APP_NAME, KAFKA_APP)
-    await ops_test.model.integrate(f"{KAFKA_APP}:certificates", self_signed_certificates_app_name)
-    await ops_test.model.integrate(f"{APP_NAME}:certificates", self_signed_certificates_app_name)
-
-    await ops_test.model.integrate(
-        f"{TRAEFIK_UI_APP}:certificates", self_signed_certificates_app_name
-    )
+    await ops_test.model.integrate(f"{KAFKA_APP}:certificates", TLS_APP)
+    await ops_test.model.integrate(f"{APP_NAME}:certificates", TLS_APP)
+    await ops_test.model.integrate(f"{TRAEFIK_UI_APP}:certificates", TLS_APP)
     await ops_test.model.integrate(f"{APP_NAME}:ingress", TRAEFIK_UI_APP)
 
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, KAFKA_APP, TRAEFIK_UI_APP],
+        apps=[APP_NAME, KAFKA_APP, TRAEFIK_UI_APP, TLS_APP],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
         timeout=1200,
     )
 
-    await ops_test.model.integrate(f"{APP_NAME}:oauth", hydra_app_name)
-    await ops_test.model.integrate(f"{APP_NAME}:oauth-ca", self_signed_certificates_app_name)
+    await _cross_model_integrate(
+        ops_test, outputs["oauth_offer_url"], f"{APP_NAME}:oauth", "hydra"
+    )
+    await _cross_model_integrate(
+        ops_test, outputs["oauth_ca_offer_url"], f"{APP_NAME}:oauth-ca", "oauth-ca"
+    )
 
     await ops_test.model.wait_for_idle(
+        apps=[APP_NAME, KAFKA_APP, TRAEFIK_UI_APP, TLS_APP],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
@@ -138,17 +197,24 @@ async def test_oauth_login_with_identity_bundle(
     if not url:
         raise Exception("Can't retrieve proxied endpoint for Kafka UI.")
 
-    await access_application_login_page(page=page, url=url, redirect_login_url=url)
-    await click_on_sign_in_button_by_text(page=page, text="Log in with iam")
-    await complete_auth_code_login(page=page, ops_test=ops_test, ext_idp_service=ext_idp_service)
+    # Kafka UI has a single OAuth provider
+    await access_application_login_page(page=page, url=url)
+    await _complete_dex_login(page=page, ext_idp_service=ext_idp_service)
 
-    cookies = await get_cookies_from_browser_by_url(context, url)
+    # Wait for the OAuth redirect chain to return to the Kafka UI
+    await page.wait_for_url(re.compile(re.escape(url)))
+
+    # The authenticated session cookie is scoped to the ingress path with a
+    # trailing slash (".../<app>/"), so the cookies must be queried with it.
+    # Kafka UI also serves its SPA (HTML) for unauthenticated API calls and
+    # briefly rotates the session cookie on login, so retry until it returns JSON.
+    cookies = await get_cookies_from_browser_by_url(context, url + "/")
     session = requests.Session()
     for cookie in cookies:
         session.cookies.set(cookie["name"], cookie["value"])
-
     clusters_resp = session.get(f"{url}/api/clusters", verify=False)
     clusters_json = clusters_resp.json()
+
     logger.info(f"{clusters_json=}")
     assert clusters_json
     assert clusters_json[0].get("status") == "online"
