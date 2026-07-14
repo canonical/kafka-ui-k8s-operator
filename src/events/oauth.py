@@ -78,6 +78,10 @@ class OAuthHandler(Object):
             event.defer()
             return
 
+        if not self.cert_transfer.get_all_certificates():
+            event.defer()
+            return
+
         self.reconcile_ca_truststore()
         self.charm.workload.restart()
 

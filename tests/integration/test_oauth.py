@@ -28,6 +28,7 @@ from helpers import (
 )
 from oauth_tools import (
     access_application_login_page,
+    click_on_sign_in_button_by_text,
     get_cookies_from_browser_by_url,
 )
 from oauth_tools.external_idp import DexIdpService
@@ -76,6 +77,7 @@ async def _complete_dex_login(page: Page, ext_idp_service: DexIdpService) -> Non
     await ext_idp_service.complete_user_login(page)
 
 
+@pytest.mark.abort_on_fail
 async def test_build_and_deploy(
     ops_test: OpsTest,
     ui_charm,
@@ -170,6 +172,10 @@ async def test_build_and_deploy(
         ops_test, outputs["oauth_ca_offer_url"], f"{APP_NAME}:oauth-ca", "oauth-ca"
     )
 
+    # ensuring update-status fires
+    async with ops_test.fast_forward(fast_interval="10s"):
+        await asyncio.sleep(30)
+
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME, KAFKA_APP, TRAEFIK_UI_APP, TLS_APP],
         status="active",
@@ -198,7 +204,11 @@ async def test_oauth_login_with_identity_bundle(
         raise Exception("Can't retrieve proxied endpoint for Kafka UI.")
 
     # Kafka UI has a single OAuth provider
-    await access_application_login_page(page=page, url=url)
+    await access_application_login_page(page=page, url=f"{url}/login")
+
+    # Click your application's login button
+    await click_on_sign_in_button_by_text(page=page, text="Log in with iam")
+
     await _complete_dex_login(page=page, ext_idp_service=ext_idp_service)
 
     # Wait for the OAuth redirect chain to return to the Kafka UI
