@@ -45,10 +45,10 @@ class OAuthHandler(Object):
             self.charm.on[OAUTH_REL].relation_broken, self._on_oauth_relation_broken
         )
         self.framework.observe(
-            self.cert_transfer.on.certificate_set_updated, self._on_oauth_ca_updated
+            self.cert_transfer.on.certificate_set_updated, self._on_oauth_ca_changed
         )
         self.framework.observe(
-            self.cert_transfer.on.certificates_removed, self._on_oauth_ca_removed
+            self.cert_transfer.on.certificates_removed, self._on_oauth_ca_changed
         )
 
     def _on_oauth_relation_changed(self, event: EventBase) -> None:
@@ -72,29 +72,20 @@ class OAuthHandler(Object):
         self.charm.context.app.oauth_client_secret = ""
         self.charm.on.config_changed.emit()
 
-    def _on_oauth_ca_updated(self, event: EventBase) -> None:
-        """Handle the `certificate_set_updated` event for the `oauth-ca` relation."""
+    def _on_oauth_ca_changed(self, event: EventBase) -> None:
+        """Reconcile the OAuth CA truststore when the transferred cert set changes."""
         if not self.charm.workload.container_can_connect:
             event.defer()
             return
 
-        if not self.cert_transfer.get_all_certificates():
-            event.defer()
-            return
+        if self.reconcile_ca_truststore():
+            self.charm.workload.restart()
 
-        self.reconcile_ca_truststore()
-        self.charm.workload.restart()
+    def reconcile_ca_truststore(self) -> bool:
+        """Reconcile the JVM default truststore with the OAuth CAs.
 
-    def _on_oauth_ca_removed(self, event: EventBase) -> None:
-        """Handle the `certificates_removed` event for the `oauth-ca` relation."""
-        if not self.charm.workload.container_can_connect:
-            event.defer()
-            return
-
-        self.reconcile_ca_truststore()
-        self.charm.workload.restart()
-
-    def reconcile_ca_truststore(self) -> None:
-        """Reconcile the JVM default truststore with the OAuth CAs."""
+        Returns:
+            True if the truststore was modified.
+        """
         certificates = self.cert_transfer.get_all_certificates()
-        self.charm.tls_manager.set_oauth_truststore(certificates)
+        return self.charm.tls_manager.set_oauth_truststore(certificates)

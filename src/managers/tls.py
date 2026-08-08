@@ -414,10 +414,13 @@ class TLSManager:
                 self.remove_cert(alias)
                 self.import_cert(alias=alias, filename=f"{alias}.pem", cert_content=client.tls_ca)
 
-    def set_oauth_truststore(self, certificates: set[str]) -> None:
+    def set_oauth_truststore(self, certificates: set[str]) -> bool:
         """Reconcile the JVM default truststore to trust exactly the given OAuth CAs.
 
         Aliases are based on content (`oauth-ca-<sha256(pem)[:16]>`).
+
+        Returns:
+            True if the truststore was modified (any CA added or removed).
         """
         desired = {self.oauth_ca_alias(cert): cert for cert in certificates}
 
@@ -429,14 +432,17 @@ class TLSManager:
             if alias.startswith(OAUTH_CA_ALIAS_PREFIX)
         }
 
-        for alias in current_aliases - set(desired):
+        to_remove = current_aliases - set(desired)
+        to_add = set(desired) - current_aliases
+
+        for alias in to_remove:
             self.remove_cert(
                 alias,
                 keystore=self.workload.paths.java_truststore,
                 storepass=JAVA_CACERTS_PASSWORD,
             )
 
-        for alias in set(desired) - current_aliases:
+        for alias in to_add:
             self.import_cert(
                 alias=alias,
                 filename=f"{alias}.pem",
@@ -449,6 +455,8 @@ class TLSManager:
             f"chown {USER_NAME}:{GROUP} {self.workload.paths.java_truststore}".split()
         )
         self.workload.exec(["chmod", "770", self.workload.paths.java_truststore])
+
+        return bool(to_remove or to_add)
 
     @staticmethod
     def oauth_ca_alias(certificate: str) -> str:

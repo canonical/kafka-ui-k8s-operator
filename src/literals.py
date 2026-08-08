@@ -55,7 +55,9 @@ ADMIN_PERMISSIONS = [
 
 # Regex matching user-facing topics while excluding internal/system topics
 # (leading '_', Kafka Connect/MirrorMaker2 internal topics, and MM2 checkpoint/heartbeat topics).
-USER_TOPIC_REGEX = r"^(?!_)(?!connect-(?:offsets|configs|status)$)(?!mm2-)(?!heartbeats$)(?!checkpoints$).*"
+USER_TOPIC_REGEX = (
+    r"^(?!_)(?!connect-(?:offsets|configs|status)$)(?!mm2-)(?!heartbeats$)(?!checkpoints$).*"
+)
 # Regex matching non-internal consumer groups.
 USER_CONSUMER_REGEX = r"^(?!_)(?!connect-)(?!mm2-).*"
 

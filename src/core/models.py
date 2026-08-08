@@ -8,7 +8,6 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-import requests
 from charms.data_platform_libs.v0.data_interfaces import (
     PLUGIN_URL_NOT_REQUIRED,
     Data,
@@ -417,17 +416,6 @@ class OAuthContext:
     def jwt_access_token(self) -> bool:
         """A flag indicating if the access token is JWT or not."""
         return self.relation_data.get("jwt_access_token", "false").lower() == "true"
-
-    @property
-    def uses_trusted_ca(self) -> bool:
-        """A flag indicating if the IDP uses certificates signed by a trusted CA."""
-        try:
-            requests.get(self.issuer_url, timeout=10)
-            return True
-        except requests.exceptions.SSLError:
-            return False
-        except requests.exceptions.RequestException:
-            return True
 
 
 class AppContext(RelationContext):
