@@ -36,7 +36,12 @@ JAVA_CACERTS_PASSWORD = "changeit"
 
 CLUSTER_NAME = "kafka"
 RBAC_SUBJECT_PROVIDER = "oauth"
+
+# Predefined RBAC roles
 ADMIN_ROLE = "admin"
+CHARMED_MANAGER_ROLE = "charmed_manager"
+CHARMED_USER_ROLE = "charmed_user"
+CHARMED_STATS_ROLE = "charmed_stats"
 
 ADMIN_PERMISSIONS = [
     {"resource": "applicationconfig", "actions": "view"},
@@ -48,7 +53,59 @@ ADMIN_PERMISSIONS = [
     {"resource": "acl", "actions": ["view", "edit"]},
 ]
 
-ROLE_PERMISSIONS = {ADMIN_ROLE: ADMIN_PERMISSIONS}
+# Regex matching user-facing topics while excluding internal/system topics
+# (leading '_', Kafka Connect/MirrorMaker2 internal topics, and MM2 checkpoint/heartbeat topics).
+USER_TOPIC_REGEX = r"^(?!_)(?!connect-(?:offsets|configs|status)$)(?!mm2-)(?!heartbeats$)(?!checkpoints$).*"
+# Regex matching non-internal consumer groups.
+USER_CONSUMER_REGEX = r"^(?!_)(?!connect-)(?!mm2-).*"
+
+CHARMED_MANAGER_PERMISSIONS = [
+    {
+        "resource": "topic",
+        "value": USER_TOPIC_REGEX,
+        "actions": [
+            "view",
+            "create",
+            "edit",
+            "delete",
+            "messages_read",
+            "messages_produce",
+            "messages_delete",
+            "analysis_run",
+            "analysis_view",
+        ],
+    },
+    {"resource": "topic", "value": ".*", "actions": ["view"]},
+    {"resource": "consumer", "value": ".*", "actions": ["view"]},
+    {"resource": "consumer", "value": USER_CONSUMER_REGEX, "actions": ["reset_offsets", "delete"]},
+    {"resource": "schema", "value": ".*", "actions": ["view"]},
+]
+
+CHARMED_USER_PERMISSIONS = [
+    {
+        "resource": "topic",
+        "value": USER_TOPIC_REGEX,
+        "actions": ["view", "messages_read", "messages_produce"],
+    },
+    {"resource": "topic", "value": ".*", "actions": ["view"]},
+    {"resource": "consumer", "value": ".*", "actions": ["view"]},
+    {"resource": "schema", "value": ".*", "actions": ["view"]},
+]
+
+CHARMED_STATS_PERMISSIONS = [
+    {"resource": "topic", "value": ".*", "actions": ["view"]},
+    {"resource": "consumer", "value": ".*", "actions": ["view"]},
+    {"resource": "schema", "value": ".*", "actions": ["view"]},
+    {"resource": "connect", "value": ".*", "actions": ["view"]},
+    {"resource": "clusterconfig", "actions": ["view"]},
+]
+
+ROLE_PERMISSIONS = {
+    ADMIN_ROLE: ADMIN_PERMISSIONS,
+    CHARMED_MANAGER_ROLE: CHARMED_MANAGER_PERMISSIONS,
+    CHARMED_USER_ROLE: CHARMED_USER_PERMISSIONS,
+    CHARMED_STATS_ROLE: CHARMED_STATS_PERMISSIONS,
+}
 
 Substrates = Literal["vm", "k8s"]
 DebugLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
