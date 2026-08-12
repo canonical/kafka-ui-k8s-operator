@@ -25,6 +25,7 @@ from helpers import (
     TRAEFIK_CHANNEL,
     TerraformDeployer,
     all_active_idle,
+    wait_for_ui_serving,
 )
 from oauth_tools import (
     access_application_login_page,
@@ -199,6 +200,8 @@ async def test_oauth_login_with_identity_bundle(
     url = proxied_endpoints.get(APP_NAME, {}).get("url")
     if not url:
         raise Exception("Can't retrieve proxied endpoint for Kafka UI.")
+
+    await wait_for_ui_serving(url)
 
     # Kafka UI has a single OAuth provider
     await access_application_login_page(page=page, url=f"{url}/login")

@@ -31,7 +31,6 @@ class OAuthHandler(Object):
             redirect_uri=f"{self.charm.context.ingress_url}/login/oauth2/code/iam",
             scope="openid profile email phone offline address",
             grant_types=["authorization_code"],
-            # token_endpoint_auth_method="client_secret_post",
         )
         self.oauth = OAuthRequirer(self.charm, client_config, relation_name=OAUTH_REL)
         self.cert_transfer = CertificateTransferRequires(self.charm, OAUTH_CA_REL)
@@ -46,7 +45,7 @@ class OAuthHandler(Object):
             self.cert_transfer.on.certificate_set_updated, self._on_oauth_ca_changed
         )
         self.framework.observe(
-            self.cert_transfer.on.certificates_removed, self._on_oauth_ca_changed
+            self.cert_transfer.on.certificates_removed, self._on_oauth_ca_removed
         )
 
     def _on_oauth_relation_changed(self, event: EventBase) -> None:
@@ -72,6 +71,20 @@ class OAuthHandler(Object):
 
     def _on_oauth_ca_changed(self, event: EventBase) -> None:
         """Reconcile the OAuth CA truststore when the transferred cert set changes."""
+        if not self.charm.workload.container_can_connect:
+            event.defer()
+            return
+
+        if not self.cert_transfer.get_all_certificates():
+            logger.debug("OAuth CA not transferred yet, deferring truststore reconcile")
+            event.defer()
+            return
+
+        if self.reconcile_ca_truststore():
+            self.charm.workload.restart()
+
+    def _on_oauth_ca_removed(self, event: EventBase) -> None:
+        """Drop the transferred OAuth CAs from the truststore once the relation is gone."""
         if not self.charm.workload.container_can_connect:
             event.defer()
             return

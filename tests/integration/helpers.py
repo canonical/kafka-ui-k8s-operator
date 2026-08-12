@@ -9,11 +9,13 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from subprocess import PIPE, check_output
 from typing import Any
 
 import jubilant
+import requests
 import yaml
 
 from core.models import AppContext
@@ -56,6 +58,26 @@ IMAGE_URI = METADATA["resources"][IMAGE_RESOURCE_KEY]["upstream-source"]
 def all_active_idle(status: jubilant.Status, *apps: str):
     """Check all units are in active|idle state."""
     return jubilant.all_agents_idle(status, *apps) and jubilant.all_active(status, *apps)
+
+
+def wait_for_ui_serving(url: str, timeout: int = 600, delay: int = 5) -> None:
+    """Block until the Kafka UI actually serves the given URL."""
+    deadline = time.time() + timeout
+    last = ""
+    while time.time() < deadline:
+        try:
+            response = requests.get(url, verify=False, timeout=10)
+            if response.status_code < 500:
+                logger.info(f"Kafka UI serving {url} ({response.status_code})")
+                return
+            last = f"HTTP {response.status_code}"
+        except requests.RequestException as e:
+            last = repr(e)
+
+        logger.info(f"Waiting for Kafka UI at {url} ({last})")
+        time.sleep(delay)
+
+    raise TimeoutError(f"Kafka UI did not serve {url} within {timeout}s (last: {last})")
 
 
 def get_secret_by_label(juju: jubilant.Juju, label: str, owner: str) -> dict[str, str]:
