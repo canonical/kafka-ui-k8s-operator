@@ -77,7 +77,7 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
 
         if SUBSTRATE == "k8s":
             self.framework.observe(
-                getattr(self.on, "kafka_ui_pebble_ready"), self._on_pebble_ready
+                getattr(self.on, "kafka_ui_pebble_ready"), self._on_config_changed
             )
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -89,35 +89,13 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
             self.framework.observe(self.on[relation].relation_changed, self._on_config_changed)
             self.framework.observe(self.on[relation].relation_broken, self._on_config_changed)
 
-    def _on_pebble_ready(self, event: ops.PebbleReadyEvent) -> None:
-        """Handle `pebble_ready` event.
-
-        Copy the local cacerts truststore into a writable truststore.
-        """
-        if not self.workload.container_can_connect:
-            event.defer()
-            return
-
-        # Copy the local cacerts truststore into a writable truststore
-        self.workload.exec(
-            command=[
-                "cp",
-                self.workload.paths.java_cacerts,
-                self.workload.paths.java_truststore,
-            ]
-        )
-
-        # re-import the transferred CA before the service restarts
-        self.oauth.reconcile_ca_truststore()
-
-        self.on.config_changed.emit()
-
     def _on_config_changed(self, event: ops.EventBase) -> None:
         """Handle `config-changed` and general client `relation-changed` events."""
         if not all([self.workload.container_can_connect, self.context.app]):
             event.defer()
             return
 
+        self.oauth.reconcile_ca_truststore()
         self.tls.init_unit_tls()
 
         if not self.context.app.admin_password:

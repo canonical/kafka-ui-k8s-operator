@@ -98,5 +98,16 @@ class OAuthHandler(Object):
         Returns:
             True if the truststore was modified.
         """
+        workload = self.charm.workload
+        if not (workload.root / workload.paths.java_truststore).exists():
+            # Copy the local cacerts truststore into a writable truststore
+            workload.exec(
+                command=[
+                    "cp",
+                    workload.paths.java_cacerts,
+                    workload.paths.java_truststore,
+                ]
+            )
+
         certificates = self.cert_transfer.get_all_certificates()
         return self.charm.tls_manager.set_oauth_truststore(certificates)
