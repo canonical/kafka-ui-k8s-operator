@@ -105,10 +105,7 @@ async def test_build_and_deploy(
     )
 
     # Register Kratos's OIDC callback URI on the external IdP (Dex). Kratos is an
-    # OIDC client of Dex, which rejects the login unless this redirect URI is in
-    # its allow-list. The URI depends on traefik-public's runtime ingress URL, so
-    # it can only be fetched (via the integrator's get-redirect-uri action) and
-    # registered on Dex after the identity platform is up.
+    # OIDC client of Dex, which rejects the login unless this redirect URI is in its allow-list.
     logger.info("Registering the redirect URI on the external provider")
     task = iam_juju.run(f"{KRATOS_EXTERNAL_IDP_INTEGRATOR_APP}/0", "get-redirect-uri")
     ext_idp_service.update_redirect_uri(redirect_uri=task.results["redirect-uri"])
@@ -214,10 +211,6 @@ async def test_oauth_login_with_identity_bundle(
     # Wait for the OAuth redirect chain to return to the Kafka UI
     await page.wait_for_url(re.compile(re.escape(url)))
 
-    # The authenticated session cookie is scoped to the ingress path with a
-    # trailing slash (".../<app>/"), so the cookies must be queried with it.
-    # Kafka UI also serves its SPA (HTML) for unauthenticated API calls and
-    # briefly rotates the session cookie on login, so retry until it returns JSON.
     cookies = await get_cookies_from_browser_by_url(context, url + "/")
     session = requests.Session()
     for cookie in cookies:

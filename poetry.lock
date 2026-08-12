@@ -42,7 +42,7 @@ version = "26.1.0"
 description = "Classes Without Boilerplate"
 optional = false
 python-versions = ">=3.9"
-groups = ["charm-libs"]
+groups = ["main"]
 files = [
     {file = "attrs-26.1.0-py3-none-any.whl", hash = "sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309"},
     {file = "attrs-26.1.0.tar.gz", hash = "sha256:d03ceb89cb322a8fd706d4fb91940737b6642aa36998fe130a9bc96c985eff32"},
@@ -355,6 +355,38 @@ files = [
 
 [package.dependencies]
 pycparser = {version = "*", markers = "implementation_name != \"PyPy\""}
+
+[[package]]
+name = "charmlibs-interfaces-certificate-transfer"
+version = "1.0.0"
+description = "The charmlibs.interfaces.certificate_transfer package."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "charmlibs_interfaces_certificate_transfer-1.0.0-py3-none-any.whl", hash = "sha256:21cef05199a9efa459be43207e042be6792605b70e742d8b0fed6f09c0cb232d"},
+    {file = "charmlibs_interfaces_certificate_transfer-1.0.0.tar.gz", hash = "sha256:53f230abb2b42e7c23929a2d99321b1f0e226f20595609105fbd0528fcc3cf24"},
+]
+
+[package.dependencies]
+ops = "*"
+pydantic = "*"
+
+[[package]]
+name = "charmlibs-interfaces-oauth"
+version = "1.0.0"
+description = "The charmlibs.interfaces.oauth package."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "charmlibs_interfaces_oauth-1.0.0-py3-none-any.whl", hash = "sha256:a4780185499fbdd9cf5c5db75b6abda41dc54a4b8d4b8ff3c351e6aaca1d2e3e"},
+    {file = "charmlibs_interfaces_oauth-1.0.0.tar.gz", hash = "sha256:f66377152c1561591c1222dd26bfb31782eae98746d95f5362cc74065cf50457"},
+]
+
+[package.dependencies]
+jsonschema = ">=4.26.0"
+ops = ">=2.23.1,<4"
 
 [[package]]
 name = "charmlibs-pathops"
@@ -1074,7 +1106,7 @@ version = "4.26.0"
 description = "An implementation of JSON Schema validation for Python"
 optional = false
 python-versions = ">=3.10"
-groups = ["charm-libs"]
+groups = ["main"]
 files = [
     {file = "jsonschema-4.26.0-py3-none-any.whl", hash = "sha256:d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce"},
     {file = "jsonschema-4.26.0.tar.gz", hash = "sha256:0c26707e2efad8aa1bfc5b7ce170f3fccc2e4918ff85989ba9ffa9facb2be326"},
@@ -1096,7 +1128,7 @@ version = "2025.9.1"
 description = "The JSON Schema meta-schemas and vocabularies, exposed as a Registry"
 optional = false
 python-versions = ">=3.9"
-groups = ["charm-libs"]
+groups = ["main"]
 files = [
     {file = "jsonschema_specifications-2025.9.1-py3-none-any.whl", hash = "sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe"},
     {file = "jsonschema_specifications-2025.9.1.tar.gz", hash = "sha256:b540987f239e745613c7a9176f3edb72b832a4ac465cf02712288397832b5e8d"},
@@ -2128,7 +2160,7 @@ version = "0.37.0"
 description = "JSON Referencing + Python"
 optional = false
 python-versions = ">=3.10"
-groups = ["charm-libs"]
+groups = ["main"]
 files = [
     {file = "referencing-0.37.0-py3-none-any.whl", hash = "sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231"},
     {file = "referencing-0.37.0.tar.gz", hash = "sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8"},
@@ -2186,7 +2218,7 @@ version = "0.30.0"
 description = "Python bindings to Rust's persistent data structures (rpds)"
 optional = false
 python-versions = ">=3.10"
-groups = ["charm-libs"]
+groups = ["main"]
 files = [
     {file = "rpds_py-0.30.0-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:679ae98e00c0e8d68a7fda324e16b90fd5260945b45d3b824c892cec9eea3288"},
     {file = "rpds_py-0.30.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:4cc2206b76b4f576934f0ed374b10d7ca5f457858b157ca52064bdfc26b9fc00"},
@@ -2658,4 +2690,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "a73f518410c464ec02dc6102949ff8d75d430b2977acbf3935f7ffed3e4f51fd"
+content-hash = "a6373a438416389a44572ddcb7cf8cc5e955e63c7a1ca6733663674a04bef92c"

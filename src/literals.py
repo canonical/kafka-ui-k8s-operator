@@ -41,6 +41,7 @@ RBAC_SUBJECT_PROVIDER = "oauth"
 ADMIN_ROLE = "admin"
 CHARMED_MANAGER_ROLE = "charmed_manager"
 CHARMED_USER_ROLE = "charmed_user"
+CHARMED_READ_ROLE = "charmed_read"
 CHARMED_STATS_ROLE = "charmed_stats"
 
 ADMIN_PERMISSIONS = [
@@ -94,6 +95,17 @@ CHARMED_USER_PERMISSIONS = [
     {"resource": "schema", "value": ".*", "actions": ["view"]},
 ]
 
+CHARMED_READ_PERMISSIONS = [
+    {
+        "resource": "topic",
+        "value": USER_TOPIC_REGEX,
+        "actions": ["view", "messages_read"],
+    },
+    {"resource": "topic", "value": ".*", "actions": ["view"]},
+    {"resource": "consumer", "value": ".*", "actions": ["view"]},
+    {"resource": "schema", "value": ".*", "actions": ["view"]},
+]
+
 CHARMED_STATS_PERMISSIONS = [
     {"resource": "topic", "value": ".*", "actions": ["view"]},
     {"resource": "consumer", "value": ".*", "actions": ["view"]},
@@ -106,6 +118,7 @@ ROLE_PERMISSIONS = {
     ADMIN_ROLE: ADMIN_PERMISSIONS,
     CHARMED_MANAGER_ROLE: CHARMED_MANAGER_PERMISSIONS,
     CHARMED_USER_ROLE: CHARMED_USER_PERMISSIONS,
+    CHARMED_READ_ROLE: CHARMED_READ_PERMISSIONS,
     CHARMED_STATS_ROLE: CHARMED_STATS_PERMISSIONS,
 }
 

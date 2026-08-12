@@ -41,22 +41,20 @@ class ConfigManager:
         return ["JAVA_OPTS='-Xms1G -Xmx1G -XX:+UseG1GC'"]
 
     @property
-    def spring_boot_tls_config(self) -> dict:
-        """Return TLS config for Spring Boot application."""
+    def spring_ssl_config(self) -> dict:
+        """Return Spring Boot `ssl` bundle config for TLS."""
         if not self.context.unit.tls.ready or SUBSTRATE == "k8s":
             return {}
 
         return {
-            "spring": {
-                "ssl": {
-                    "bundle": {
-                        "jks": {
-                            "server": {
-                                "keystore": {
-                                    "location": self.workload.paths.keystore,
-                                    "password": self.context.unit.tls.keystore_password,
-                                    "type": "PKCS12",
-                                }
+            "ssl": {
+                "bundle": {
+                    "jks": {
+                        "server": {
+                            "keystore": {
+                                "location": self.workload.paths.keystore,
+                                "password": self.context.unit.tls.keystore_password,
+                                "type": "PKCS12",
                             }
                         }
                     }
@@ -65,19 +63,31 @@ class ConfigManager:
         }
 
     @property
-    def basic_auth(self) -> dict:
-        """Return basic auth & TLS config for the Spring Boot application."""
+    def spring_security_config(self) -> dict:
+        """Return Spring Boot `security` config (basic-auth credentials)."""
+        if self.context.oauth_relation:
+            return {}
+
         return {
-            "auth": {"type": "LOGIN_FORM"},
-            "spring": {
-                "security": {
-                    "user": {
-                        "name": self.context.app.ADMIN_USERNAME,
-                        "password": self.context.app.admin_password,
-                    }
+            "security": {
+                "user": {
+                    "name": self.context.app.ADMIN_USERNAME,
+                    "password": self.context.app.admin_password,
                 }
-            },
+            }
         }
+
+    @property
+    def spring_config(self) -> dict:
+        """Return combined Spring Boot `spring` config."""
+        _config = self.spring_security_config | self.spring_ssl_config
+
+        return {"spring": _config} if _config else {}
+
+    @property
+    def basic_auth(self) -> dict:
+        """Return basic auth config for the Spring Boot application."""
+        return {"auth": {"type": "LOGIN_FORM"}}
 
     @property
     def oauth_config(self) -> dict:
@@ -260,11 +270,8 @@ class ConfigManager:
             | self.monitoring_config
             | self.webclient_config
             | self.server_config
+            | self.spring_config
         )
-
-        # 'security' and 'ssl' both live under the 'spring' key
-        if spring := config.get("spring", {}) | self.spring_boot_tls_config.get("spring", {}):
-            config["spring"] = spring
 
         return config
 

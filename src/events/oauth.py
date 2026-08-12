@@ -7,10 +7,8 @@
 import logging
 from typing import TYPE_CHECKING
 
-from charms.certificate_transfer_interface.v1.certificate_transfer import (
-    CertificateTransferRequires,
-)
-from charms.hydra.v0.oauth import ClientConfig, OAuthRequirer
+from charmlibs.interfaces.certificate_transfer import CertificateTransferRequires
+from charmlibs.interfaces.oauth import ClientConfig, OAuthRequirer
 from ops.framework import EventBase, Object
 
 from literals import OAUTH_CA_REL, OAUTH_REL
