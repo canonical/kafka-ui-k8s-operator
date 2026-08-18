@@ -50,6 +50,7 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
 
         self.workload = Workload(container=self.unit.get_container(CONTAINER))
         self.context = Context(self)
+        self.workload.java_truststore_password = self.context.app.oauth_truststore_password
         self.pending_inactive_statuses: list[Status] = []
 
         if SUBSTRATE == "k8s":
@@ -95,13 +96,15 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        self.init_app_passwords()
+
+        if not self.workload.java_truststore_password:
+            logger.debug("App passwords not created by the leader yet, deferring")
+            event.defer()
+            return
+
         self.oauth.reconcile_ca_truststore()
         self.tls.init_unit_tls()
-
-        if not self.context.app.admin_password:
-            self.context.app.update(
-                {self.context.app.ADMIN_PASSWORD: self.workload.generate_password()}
-            )
 
         config_changed = self.config_manager.config_changed()
         truststore_changed = self.tls_manager.truststore_changed()
@@ -119,6 +122,19 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
         )
 
         self.workload.restart()
+
+    def init_app_passwords(self) -> None:
+        """Create the app-wide passwords on first deployment."""
+        if not self.unit.is_leader():
+            return
+
+        if not self.context.app.admin_password:
+            self.context.app.admin_password = self.workload.generate_password()
+
+        if not self.context.app.oauth_truststore_password:
+            self.context.app.oauth_truststore_password = self.workload.generate_password()
+
+        self.workload.java_truststore_password = self.context.app.oauth_truststore_password
 
     def _on_update_status(self, _) -> None:
         """Handle `update-status` event."""

@@ -118,7 +118,7 @@ class Workload(WorkloadBase):
             f"-Dspring.config.additional-location={self.paths.application_local_config}",
             f"-Djavax.net.ssl.trustStore={self.paths.java_truststore}",
             "-Djavax.net.ssl.trustStoreType=PKCS12",
-            "-Djavax.net.ssl.trustStorePassword=changeit",
+            f"-Djavax.net.ssl.trustStorePassword={self.java_truststore_password}",
         ]
 
         command += [

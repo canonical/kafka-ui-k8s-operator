@@ -66,6 +66,7 @@ class WorkloadBase(ABC):
 
     paths: Paths = Paths()
     root: pathops.PathProtocol
+    java_truststore_password: str = ""
 
     @abstractmethod
     def start(self) -> None:

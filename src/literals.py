@@ -32,7 +32,7 @@ OAUTH_REL = "oauth"
 OAUTH_CA_REL = "oauth-ca"
 
 OAUTH_CA_ALIAS_PREFIX = "oauth-ca-"
-JAVA_CACERTS_PASSWORD = "changeit"
+JAVA_CACERTS_DEFAULT_PASSWORD = "changeit"
 
 CLUSTER_NAME = "kafka"
 RBAC_SUBJECT_PROVIDER = "oauth"

@@ -29,7 +29,6 @@ from core.models import Context, GeneratedCa, SelfSignedCertificate, TLSContext,
 from core.workload import WorkloadBase
 from literals import (
     GROUP,
-    JAVA_CACERTS_PASSWORD,
     OAUTH_CA_ALIAS_PREFIX,
     SNAP_NAME,
     USER_NAME,
@@ -414,6 +413,25 @@ class TLSManager:
                 self.remove_cert(alias)
                 self.import_cert(alias=alias, filename=f"{alias}.pem", cert_content=client.tls_ca)
 
+    def set_truststore_password(self, keystore: str, old_password: str, new_password: str) -> None:
+        """Change the store password of a JKS/PKCS12 keystore."""
+        command = [
+            self.keytool,
+            "-storepasswd",
+            "-new",
+            new_password,
+            "-keystore",
+            keystore,
+            "-storepass",
+            old_password,
+            "-noprompt",
+        ]
+        try:
+            self.workload.exec(command=command, working_dir=self.workload.paths.config_dir)
+        except (subprocess.CalledProcessError, ExecError) as e:
+            logger.error(e.stdout)
+            raise e
+
     def set_oauth_truststore(self, certificates: set[str]) -> bool:
         """Reconcile the JVM default truststore to trust exactly the given OAuth CAs.
 
@@ -422,12 +440,13 @@ class TLSManager:
         Returns:
             True if the truststore was modified (any CA added or removed).
         """
+        storepass = self.workload.java_truststore_password
         desired = {self.oauth_ca_alias(cert): cert for cert in certificates}
 
         current_aliases = {
             alias
             for alias in self.get_trusted_certificates(
-                self.workload.paths.java_truststore, storepass=JAVA_CACERTS_PASSWORD
+                self.workload.paths.java_truststore, storepass=storepass
             )
             if alias.startswith(OAUTH_CA_ALIAS_PREFIX)
         }
@@ -439,7 +458,7 @@ class TLSManager:
             self.remove_cert(
                 alias,
                 keystore=self.workload.paths.java_truststore,
-                storepass=JAVA_CACERTS_PASSWORD,
+                storepass=storepass,
             )
 
         for alias in to_add:
@@ -448,7 +467,7 @@ class TLSManager:
                 filename=f"{alias}.pem",
                 cert_content=desired[alias],
                 keystore=self.workload.paths.java_truststore,
-                storepass=JAVA_CACERTS_PASSWORD,
+                storepass=storepass,
             )
 
         self.workload.exec(

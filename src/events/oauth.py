@@ -11,7 +11,7 @@ from charmlibs.interfaces.certificate_transfer import CertificateTransferRequire
 from charmlibs.interfaces.oauth import ClientConfig, OAuthRequirer
 from ops.framework import EventBase, Object
 
-from literals import OAUTH_CA_REL, OAUTH_REL
+from literals import JAVA_CACERTS_DEFAULT_PASSWORD, OAUTH_CA_REL, OAUTH_REL
 
 if TYPE_CHECKING:
     from charm import KafkaUiCharm
@@ -75,6 +75,11 @@ class OAuthHandler(Object):
             event.defer()
             return
 
+        if not self.charm.workload.java_truststore_password:
+            logger.debug("Truststore password not created yet, deferring truststore reconcile")
+            event.defer()
+            return
+
         if not self.cert_transfer.get_all_certificates():
             logger.debug("OAuth CA not transferred yet, deferring truststore reconcile")
             event.defer()
@@ -89,6 +94,11 @@ class OAuthHandler(Object):
             event.defer()
             return
 
+        if not self.charm.workload.java_truststore_password:
+            logger.debug("Truststore password not created yet, deferring truststore reconcile")
+            event.defer()
+            return
+
         if self.reconcile_ca_truststore():
             self.charm.workload.restart()
 
@@ -98,15 +108,20 @@ class OAuthHandler(Object):
         Returns:
             True if the truststore was modified.
         """
-        workload = self.charm.workload
-        if not (workload.root / workload.paths.java_truststore).exists():
-            # Copy the local cacerts truststore into a writable truststore
-            workload.exec(
+        if not (self.charm.workload.root / self.charm.workload.paths.java_truststore).exists():
+            # Copy the local cacerts truststore into a writable truststore, then set the
+            # app password on it so it matches the one the service is started with.
+            self.charm.workload.exec(
                 command=[
                     "cp",
-                    workload.paths.java_cacerts,
-                    workload.paths.java_truststore,
+                    self.charm.workload.paths.java_cacerts,
+                    self.charm.workload.paths.java_truststore,
                 ]
+            )
+            self.charm.tls_manager.set_truststore_password(
+                keystore=self.charm.workload.paths.java_truststore,
+                old_password=JAVA_CACERTS_DEFAULT_PASSWORD,
+                new_password=self.charm.workload.java_truststore_password,
             )
 
         certificates = self.cert_transfer.get_all_certificates()
