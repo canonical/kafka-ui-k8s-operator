@@ -20,6 +20,7 @@ from tenacity import retry, retry_if_exception, stop_after_attempt, wait_fixed
 
 from core.models import Context
 from core.structured_config import CharmConfig
+from events.oauth import OAuthHandler
 from events.tls import TLSHandler
 from events.user_secrets import SecretsHandler
 from literals import (
@@ -49,7 +50,11 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
 
         self.workload = Workload(container=self.unit.get_container(CONTAINER))
         self.context = Context(self)
+        self.workload.java_truststore_password = self.context.app.oauth_truststore_password
         self.pending_inactive_statuses: list[Status] = []
+
+        if SUBSTRATE == "k8s":
+            self.ingress = IngressPerAppRequirer(self, port=PORT, scheme="http")
 
         # Managers
         self.config_manager = ConfigManager(
@@ -67,9 +72,14 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
         self.karapace_events = KarapaceRequirerEventHandlers(
             self, self.context.karapace_client_interface
         )
+        self.oauth = OAuthHandler(self)
         self.tls = TLSHandler(self)
         self.user_secrets = SecretsHandler(self)
 
+        if SUBSTRATE == "k8s":
+            self.framework.observe(
+                getattr(self.on, "kafka_ui_pebble_ready"), self._on_config_changed
+            )
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.update_status, self._on_update_status)
@@ -80,21 +90,21 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
             self.framework.observe(self.on[relation].relation_changed, self._on_config_changed)
             self.framework.observe(self.on[relation].relation_broken, self._on_config_changed)
 
-        if SUBSTRATE == "k8s":
-            self.ingress = IngressPerAppRequirer(self, port=PORT, scheme="http")
-
     def _on_config_changed(self, event: ops.EventBase) -> None:
         """Handle `config-changed` and general client `relation-changed` events."""
         if not all([self.workload.container_can_connect, self.context.app]):
             event.defer()
             return
 
-        self.tls.init_unit_tls()
+        self.init_app_passwords()
 
-        if not self.context.app.admin_password:
-            self.context.app.update(
-                {self.context.app.ADMIN_PASSWORD: self.workload.generate_password()}
-            )
+        if not self.workload.java_truststore_password:
+            logger.debug("App passwords not created by the leader yet, deferring")
+            event.defer()
+            return
+
+        self.oauth.reconcile_ca_truststore()
+        self.tls.init_unit_tls()
 
         config_changed = self.config_manager.config_changed()
         truststore_changed = self.tls_manager.truststore_changed()
@@ -112,6 +122,19 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
         )
 
         self.workload.restart()
+
+    def init_app_passwords(self) -> None:
+        """Create the app-wide passwords on first deployment."""
+        if not self.unit.is_leader():
+            return
+
+        if not self.context.app.admin_password:
+            self.context.app.admin_password = self.workload.generate_password()
+
+        if not self.context.app.oauth_truststore_password:
+            self.context.app.oauth_truststore_password = self.workload.generate_password()
+
+        self.workload.java_truststore_password = self.context.app.oauth_truststore_password
 
     def _on_update_status(self, _) -> None:
         """Handle `update-status` event."""

@@ -27,6 +27,7 @@ from literals import (
     KAFKA_CONNECT_REL,
     KAFKA_REL,
     KARAPACE_REL,
+    OAUTH_REL,
     PEER_REL,
     PORT,
     SUBSTRATE,
@@ -371,11 +372,77 @@ class TLSContext(RelationContext):
         return None
 
 
+class OAuthData(Data):
+    """Builds the data interface for the oauth relation.
+
+    Exists only so OAuthContext can be built like every other RelationContext
+    subclass.
+    """
+
+    # NOTE: These fields should always be empty. Secrets are fetched using the actual
+    # oauth library methods instead.
+    SECRET_FIELDS: list[str] = []
+
+    def _load_secrets_from_databag(self, relation: Relation) -> None:
+        """No-op: no fields on this relation are managed as data-interfaces secrets."""
+        return
+
+
+class OAuthContext(RelationContext):
+    """State collection metadata for the oauth relation."""
+
+    def __init__(
+        self,
+        relation: Relation | None,
+        data_interface: OAuthData,
+        client_secret: str = "",
+    ):
+        super().__init__(relation, data_interface, None)
+        self._client_secret = client_secret
+
+    @property
+    def client_id(self) -> str:
+        """The OAuth client ID issued by the provider."""
+        return self.relation_data.get("client_id", "")
+
+    @property
+    def client_secret(self) -> str:
+        """Client secret created by Hydra."""
+        return self._client_secret
+
+    @property
+    def issuer_url(self) -> str:
+        """The OIDC issuer URL of the provider."""
+        return self.relation_data.get("issuer_url", "")
+
+    @property
+    def jwks_endpoint(self) -> str:
+        """The JWKS endpoint needed to validate JWT tokens."""
+        return self.relation_data.get("jwks_endpoint", "")
+
+    @property
+    def introspection_endpoint(self) -> str:
+        """The introspection endpoint needed to validate non-JWT tokens."""
+        return self.relation_data.get("introspection_endpoint", "")
+
+    @property
+    def jwt_access_token(self) -> bool:
+        """A flag indicating if the access token is JWT or not."""
+        return self.relation_data.get("jwt_access_token", "false").lower() == "true"
+
+    @property
+    @override
+    def status(self) -> Status:
+        return Status.ACTIVE
+
+
 class AppContext(RelationContext):
     """Context collection metadata for Kafka UI peer relation."""
 
     ADMIN_USERNAME = "admin"
     ADMIN_PASSWORD = "admin-password"
+    OAUTH_CLIENT_SECRET = "oauth-client-secret"
+    OAUTH_TRUSTSTORE_PASSWORD = "oauth-truststore-password"
 
     def __init__(self, relation, data_interface, component):
         super().__init__(relation, data_interface, component)
@@ -391,6 +458,30 @@ class AppContext(RelationContext):
     @admin_password.setter
     def admin_password(self, value: str) -> None:
         self.update({self.ADMIN_PASSWORD: value})
+
+    @property
+    def oauth_client_secret(self) -> str:
+        """Client secret of the Oauth relation."""
+        if not self.relation:
+            return ""
+
+        return self.relation_data.get(self.OAUTH_CLIENT_SECRET, "")
+
+    @oauth_client_secret.setter
+    def oauth_client_secret(self, value: str) -> None:
+        self.update({self.OAUTH_CLIENT_SECRET: value})
+
+    @property
+    def oauth_truststore_password(self) -> str:
+        """Truststore password of the Oauth relation."""
+        if not self.relation:
+            return ""
+
+        return self.relation_data.get(self.OAUTH_TRUSTSTORE_PASSWORD, "")
+
+    @oauth_truststore_password.setter
+    def oauth_truststore_password(self, value: str) -> None:
+        self.update({self.OAUTH_TRUSTSTORE_PASSWORD: value})
 
     @property
     @override
@@ -446,13 +537,18 @@ class Context(WithStatus, Object):
 
     def __init__(self, charm: "KafkaUiCharm"):
         super().__init__(parent=charm, key="charm_context")
+        self.charm = charm
         self.config = charm.config
 
         # peer
         self.peer_app_interface = DataPeerData(
             self.model,
             relation_name=PEER_REL,
-            additional_secret_fields=[AppContext.ADMIN_PASSWORD],
+            additional_secret_fields=[
+                AppContext.ADMIN_PASSWORD,
+                AppContext.OAUTH_CLIENT_SECRET,
+                AppContext.OAUTH_TRUSTSTORE_PASSWORD,
+            ],
         )
         self.peer_unit_interface = DataPeerUnitData(
             self.model, relation_name=PEER_REL, additional_secret_fields=TLSContext.SECRETS
@@ -471,6 +567,7 @@ class Context(WithStatus, Object):
         self.karapace_client_interface = KarapaceRequirerData(
             self.model, relation_name=KARAPACE_REL, subject="__kafka-ui", extra_user_roles="admin"
         )
+        self.oauth_client_interface = OAuthData(self.model, relation_name=OAUTH_REL)
 
     @property
     def unit(self) -> UnitContext:
@@ -496,22 +593,34 @@ class Context(WithStatus, Object):
         return self.model.get_relation(PEER_REL)
 
     @property
+    def oauth_relation(self) -> Relation | None:
+        """The Kafka UI oauth relation."""
+        return self.model.get_relation(OAUTH_REL)
+
+    @property
     def kafka_client(self) -> KafkaClientContext:
         """Returns context of the kafka-client relation."""
         return KafkaClientContext(self.model.get_relation(KAFKA_REL), self.kafka_client_interface)
 
     @property
     def kafka_connect_client(self) -> ConnectClientContext:
-        """Returns context of the kafka-client relation."""
+        """Returns context of the kafka-connect-client relation."""
         return ConnectClientContext(
             self.model.get_relation(KAFKA_CONNECT_REL), self.connect_client_interface
         )
 
     @property
     def karapace_client(self) -> KarapaceClientContext:
-        """Returns context of the kafka-client relation."""
+        """Returns context of the karapace-client relation."""
         return KarapaceClientContext(
             self.model.get_relation(KARAPACE_REL), self.karapace_client_interface
+        )
+
+    @property
+    def oauth_client(self) -> OAuthContext:
+        """Returns context of the oauth relation."""
+        return OAuthContext(
+            self.oauth_relation, self.oauth_client_interface, self.app.oauth_client_secret
         )
 
     @property
@@ -535,6 +644,14 @@ class Context(WithStatus, Object):
         """Returns the UI web server endpoint."""
         proto = "http" if not SUBSTRATE == "k8s" else "https"
         return f"{proto}://{self.unit.internal_address}:{PORT}{self.context_path}"
+
+    @property
+    def ingress_url(self) -> str:
+        """Returns the ingress URL if available, otherwise the endpoint."""
+        if SUBSTRATE == "k8s":
+            return self.charm.ingress.url or ""
+
+        return self.endpoint
 
     @property
     @override

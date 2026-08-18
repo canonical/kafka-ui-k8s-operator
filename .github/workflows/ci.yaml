@@ -47,11 +47,12 @@ jobs:
       fail-fast: false
       matrix:
         tox-environments:
-          - integration
+          - integration-charm
+          - integration-oauth
         tls:
           - "--tls"
           - ""
-    name: Integration ${{ matrix.tls }}
+    name: ${{ matrix.tox-environments }} ${{ matrix.tls }}
     needs:
       - lint
       - build
@@ -73,6 +74,9 @@ jobs:
         with:
           pattern: ${{ needs.build.outputs.artifact-prefix }}-*
           merge-multiple: true
+      - name: Install terraform snap
+        run: |
+          sudo snap install terraform --channel=latest/stable --classic
       - name: Select tests
         id: select-tests
         run: |

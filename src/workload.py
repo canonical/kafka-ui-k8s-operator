@@ -115,11 +115,17 @@ class Workload(WorkloadBase):
     def layer(self) -> pebble.Layer:
         command = [
             "java",
-            f"-Dspring.config.additional-location={self.paths.config_dir}/application-local.yml",
+            f"-Dspring.config.additional-location={self.paths.application_local_config}",
+            f"-Djavax.net.ssl.trustStore={self.paths.java_truststore}",
+            "-Djavax.net.ssl.trustStoreType=PKCS12",
+            f"-Djavax.net.ssl.trustStorePassword={self.java_truststore_password}",
+        ]
+
+        command += [
             "--add-opens",
             "java.rmi/javax.rmi.ssl=ALL-UNNAMED",
             "-jar",
-            "/opt/kafka-ui/libs/api-1.3.0.jar",
+            self.paths.jar,
         ]
 
         layer_config: pebble.LayerDict = {
@@ -140,7 +146,6 @@ class Workload(WorkloadBase):
             },
         }
         return pebble.Layer(layer_config)
-        raise NotImplementedError
 
     @override
     def set_environment(self, env_vars: Iterable[str]) -> None:
