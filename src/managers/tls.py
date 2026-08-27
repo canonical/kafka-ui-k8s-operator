@@ -334,6 +334,40 @@ class TLSManager:
 
         return Sans(sans_ip=sorted(sans_ip), sans_dns=sorted(sans_dns))
 
+    @property
+    def sans_change_detected(self) -> bool:
+        """Check whether SANs has changed or not.
+
+        Done via a comparison of TLS context with the last state available to the manager.
+        """
+        if not self.tls_context.ready:
+            return False
+
+        current_sans = self.get_current_sans()
+        expected_sans = self.build_sans()
+
+        current_sans_ip = set(current_sans.sans_ip) if current_sans else set()
+        expected_sans_ip = set(expected_sans.sans_ip) if current_sans else set()
+        sans_ip_changed = current_sans_ip ^ expected_sans_ip
+
+        current_sans_dns = set(current_sans.sans_dns) if current_sans else set()
+        expected_sans_dns = set(expected_sans.sans_dns) if current_sans else set()
+        sans_dns_changed = current_sans_dns ^ expected_sans_dns
+
+        if not sans_ip_changed and not sans_dns_changed:
+            return False
+
+        logger.info(
+            (
+                f"SANs change detected - "
+                f"OLD SANs IP = {current_sans_ip - expected_sans_ip}, "
+                f"NEW SANs IP = {expected_sans_ip - current_sans_ip}, "
+                f"OLD SANs DNS = {current_sans_dns - expected_sans_dns}, "
+                f"NEW SANs DNS = {expected_sans_dns - current_sans_dns}"
+            )
+        )
+        return True
+
     def truststore_changed(self) -> bool:
         """Check if related apps certs is different from what is stored in the truststore."""
         currently_trusted = self.get_trusted_certificates(self.workload.paths.truststore).values()
@@ -433,54 +467,52 @@ class TLSManager:
             raise e
 
     def set_oauth_truststore(self, certificates: set[str]) -> bool:
-        """Reconcile the JVM default truststore to trust exactly the given OAuth CAs.
+        """Reconcile the OAuth CA(s) in the JVM default truststore.
 
-        Aliases are based on content (`oauth-ca-<sha256(pem)[:16]>`).
+        Args:
+            certificates: the full, current set of CA certificates transferred over the
+                `oauth-ca` relation.
 
         Returns:
-            True if the truststore was modified (any CA added or removed).
+            True if the truststore was modified.
         """
+        keystore = self.workload.paths.java_truststore
         storepass = self.workload.java_truststore_password
-        desired = {self.oauth_ca_alias(cert): cert for cert in certificates}
 
         current_aliases = {
             alias
-            for alias in self.get_trusted_certificates(
-                self.workload.paths.java_truststore, storepass=storepass
-            )
+            for alias in self.get_trusted_certificates(keystore, storepass)
             if alias.startswith(OAUTH_CA_ALIAS_PREFIX)
         }
+        desired_aliases = {self.oauth_ca_alias(cert) for cert in certificates}
 
-        to_remove = current_aliases - set(desired)
-        to_add = set(desired) - current_aliases
+        changed = False
+        for alias in current_aliases - desired_aliases:
+            self.remove_cert(alias, keystore=keystore, storepass=storepass)
+            changed = True
 
-        for alias in to_remove:
-            self.remove_cert(
-                alias,
-                keystore=self.workload.paths.java_truststore,
-                storepass=storepass,
-            )
-
-        for alias in to_add:
+        for cert in certificates:
+            alias = self.oauth_ca_alias(cert)
+            if alias in current_aliases:
+                continue
             self.import_cert(
                 alias=alias,
                 filename=f"{alias}.pem",
-                cert_content=desired[alias],
-                keystore=self.workload.paths.java_truststore,
+                cert_content=cert,
+                keystore=keystore,
                 storepass=storepass,
             )
+            changed = True
 
-        self.workload.exec(
-            f"chown {USER_NAME}:{GROUP} {self.workload.paths.java_truststore}".split()
-        )
-        self.workload.exec(["chmod", "770", self.workload.paths.java_truststore])
+        self.workload.exec(f"chown {USER_NAME}:{GROUP} {keystore}".split())
+        self.workload.exec(["chmod", "770", keystore])
 
-        return bool(to_remove or to_add)
+        return changed
 
     @staticmethod
     def oauth_ca_alias(certificate: str) -> str:
-        """Return a deterministic, content-derived truststore alias for an OAuth CA."""
-        digest = hashlib.sha256(certificate.encode("utf-8")).hexdigest()[:16]
+        """Derive a stable truststore alias from a CA certificate's content."""
+        digest = hashlib.sha256(certificate.encode()).hexdigest()[:16]
         return f"{OAUTH_CA_ALIAS_PREFIX}{digest}"
 
     @staticmethod

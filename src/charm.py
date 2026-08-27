@@ -103,8 +103,9 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        self.oauth.reconcile_ca_truststore()
         self.tls.init_unit_tls()
+        self.oauth.reconcile_ca_truststore()
+        self.oauth.reconcile_client_config()
 
         config_changed = self.config_manager.config_changed()
         truststore_changed = self.tls_manager.truststore_changed()
