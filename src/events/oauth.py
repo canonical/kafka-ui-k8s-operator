@@ -108,21 +108,45 @@ class OAuthHandler(Object):
         Returns:
             True if the truststore was modified.
         """
-        if not (self.charm.workload.root / self.charm.workload.paths.java_truststore).exists():
+        workload = self.charm.workload
+        if not workload.installed:
+            logger.debug("Workload not installed yet, skipping truststore reconcile")
+            return False
+
+        if not (workload.root / workload.paths.java_truststore).exists():
             # Copy the local cacerts truststore into a writable truststore, then set the
             # app password on it so it matches the one the service is started with.
-            self.charm.workload.exec(
+            workload.exec(
                 command=[
                     "cp",
-                    self.charm.workload.paths.java_cacerts,
-                    self.charm.workload.paths.java_truststore,
+                    workload.paths.java_cacerts,
+                    workload.paths.java_truststore,
                 ]
             )
             self.charm.tls_manager.set_truststore_password(
-                keystore=self.charm.workload.paths.java_truststore,
+                keystore=workload.paths.java_truststore,
                 old_password=JAVA_CACERTS_DEFAULT_PASSWORD,
-                new_password=self.charm.workload.java_truststore_password,
+                new_password=workload.java_truststore_password,
             )
 
         certificates = self.cert_transfer.get_all_certificates()
         return self.charm.tls_manager.set_oauth_truststore(certificates)
+
+    def reconcile_client_config(self) -> None:
+        """Re-issue the OAuth client config once the unit address is known."""
+        if not (self.charm.unit.is_leader() and self.charm.context.oauth_relation):
+            return
+
+        if not self.charm.context.unit.internal_address:
+            logger.debug("Unit address not available yet, deferring client config")
+            return
+
+        redirect_uri = f"{self.charm.context.ingress_url}/login/oauth2/code/iam"
+        self.oauth.update_client_config(
+            ClientConfig(
+                audience=["kafka"],
+                redirect_uri=redirect_uri,
+                scope="openid profile email phone offline address",
+                grant_types=["authorization_code"],
+            )
+        )
