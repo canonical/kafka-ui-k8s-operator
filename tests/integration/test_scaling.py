@@ -8,66 +8,22 @@ import time
 from pathlib import Path
 
 import jubilant
-import requests
 from helpers import (
     APP_NAME,
     IMAGE_RESOURCE_KEY,
     IMAGE_URI,
     KAFKA_APP,
     KAFKA_CHANNEL,
-    SECRET_KEY,
     TLS_APP,
     TLS_CHANNEL,
     TRAEFIK_APP,
     TRAEFIK_CHANNEL,
     all_active_idle,
-    get_secret_by_label,
+    assert_login,
 )
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
-
-
-def _assert_login(juju: jubilant.Juju):
-    status = juju.status()
-    unit = next(iter(status.apps[APP_NAME].units.keys()))
-    show_unit = juju.show_unit(unit)
-    match = [rel for rel in show_unit.relation_info if rel.endpoint == "traefik-route"]
-    if not match:
-        raise Exception("No traefik-route relation found!")
-
-    route_rel_data = match[0].app_data
-    base_url = f"{route_rel_data['scheme']}://{route_rel_data['external_host']}"
-    url = f"{base_url}/{juju.model}-{APP_NAME}"
-
-    secret_data = get_secret_by_label(juju, label=f"cluster.{APP_NAME}.app", owner=APP_NAME)
-    password = secret_data.get(SECRET_KEY)
-
-    if not password:
-        raise Exception("Can't fetch the admin user's password.")
-
-    login_resp = requests.post(
-        f"{url}/login",
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        data={"username": "admin", "password": password},
-        verify=False,
-    )
-    assert login_resp.status_code == 200
-    # Successful login would lead to a redirect
-    assert len(login_resp.history) > 0
-
-    cookies = login_resp.history[0].cookies
-    clusters_resp = requests.get(
-        f"{url}/api/clusters",
-        headers={"Content-Type": "application/json"},
-        cookies=cookies,
-        verify=False,
-    )
-
-    clusters_json = clusters_resp.json()
-    logger.info(f"{clusters_json=}")
-    assert len(clusters_json) > 0
-    assert clusters_json[0].get("status") == "online"
 
 
 def test_deploy_ui_and_kafka_active(juju: jubilant.Juju, ui_charm: Path):
@@ -109,7 +65,7 @@ def test_scale_with_no_route_rel(juju: jubilant.Juju):
     assert status.apps[APP_NAME].app_status.current == "active"
 
     time.sleep(30)
-    _assert_login(juju=juju)
+    assert_login(juju=juju)
 
 
 def test_min_units_availability(juju: jubilant.Juju):
@@ -126,4 +82,4 @@ def test_min_units_availability(juju: jubilant.Juju):
     time.sleep(30)
     for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(10), reraise=True):
         with attempt:
-            _assert_login(juju=juju)
+            assert_login(juju=juju)
