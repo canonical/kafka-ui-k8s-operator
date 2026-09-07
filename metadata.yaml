@@ -59,3 +59,7 @@ requires:
   oauth-ca:
     interface: certificate_transfer
     optional: true
+  traefik-route:
+      interface: traefik_route
+      limit: 1
+      optional: false

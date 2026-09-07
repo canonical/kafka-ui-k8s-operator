@@ -5,6 +5,7 @@
 """Context and data model definitions."""
 
 import json
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -12,6 +13,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
     PLUGIN_URL_NOT_REQUIRED,
     Data,
     DataPeerData,
+    DataPeerOtherUnitData,
     DataPeerUnitData,
     KafkaConnectRequirerData,
     KafkaRequirerData,
@@ -20,16 +22,18 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from ops import Object
 from ops.model import Application, Relation, RelationDataAccessError, Unit
-from typing_extensions import TYPE_CHECKING, override
+from typing_extensions import TYPE_CHECKING, Literal, override
 
 from literals import (
     DEFAULT_SECURITY_MECHANISM,
+    INGRESS_REL,
     KAFKA_CONNECT_REL,
     KAFKA_REL,
     KARAPACE_REL,
     OAUTH_REL,
     PEER_REL,
     PORT,
+    ROUTE_REL,
     SUBSTRATE,
     Status,
     Substrates,
@@ -379,6 +383,18 @@ class OAuthData(Data):
     subclass.
     """
 
+    def __init__(self, model, relation: Relation | None) -> None:
+        if not relation:
+            return
+
+        super().__init__(model, relation.name)
+        self.component = relation.app
+
+    @override
+    def fetch_my_relation_data(self, *args, **kwargs):
+        # Never used, this is requirer data; if omitted, as_dict() fails on non-leaders.
+        return {}
+
     # NOTE: These fields should always be empty. Secrets are fetched using the actual
     # oauth library methods instead.
     SECRET_FIELDS: list[str] = []
@@ -443,6 +459,7 @@ class AppContext(RelationContext):
     ADMIN_PASSWORD = "admin-password"
     OAUTH_CLIENT_SECRET = "oauth-client-secret"
     OAUTH_TRUSTSTORE_PASSWORD = "oauth-truststore-password"
+    CLUSTER_DOMAIN = "cluster-domain"
 
     def __init__(self, relation, data_interface, component):
         super().__init__(relation, data_interface, component)
@@ -482,6 +499,15 @@ class AppContext(RelationContext):
     @oauth_truststore_password.setter
     def oauth_truststore_password(self, value: str) -> None:
         self.update({self.OAUTH_TRUSTSTORE_PASSWORD: value})
+
+    @property
+    def cluster_domain(self) -> str:
+        """Return the K8s cluster domain name."""
+        return self.relation_data.get(self.CLUSTER_DOMAIN, "")
+
+    @cluster_domain.setter
+    def cluster_domain(self, value: str) -> None:
+        self.update({self.CLUSTER_DOMAIN: value})
 
     @property
     @override
@@ -567,7 +593,18 @@ class Context(WithStatus, Object):
         self.karapace_client_interface = KarapaceRequirerData(
             self.model, relation_name=KARAPACE_REL, subject="__kafka-ui", extra_user_roles="admin"
         )
-        self.oauth_client_interface = OAuthData(self.model, relation_name=OAUTH_REL)
+        self.oauth_client_interface = OAuthData(self.model, relation=self.oauth_relation)
+
+    @property
+    def peer_units_data_interfaces(self) -> dict[Unit, DataPeerOtherUnitData]:
+        """The data interface of peer units."""
+        if not self.peer_relation or not self.peer_relation.units:
+            return {}
+
+        return {
+            unit: DataPeerOtherUnitData(model=self.model, unit=unit, relation_name=PEER_REL)
+            for unit in self.peer_relation.units
+        }
 
     @property
     def unit(self) -> UnitContext:
@@ -577,6 +614,22 @@ class Context(WithStatus, Object):
             self.peer_unit_interface,
             component=self.model.unit,
         )
+
+    @property
+    def units(self) -> set[UnitContext]:
+        """Return a set of all peer units."""
+        _units = set()
+        for unit, data_interface in self.peer_units_data_interfaces.items():
+            _units.add(
+                UnitContext(
+                    relation=self.peer_relation,
+                    data_interface=data_interface,
+                    component=unit,
+                )
+            )
+        _units.add(self.unit)
+
+        return _units
 
     @property
     def app(self) -> AppContext:
@@ -596,6 +649,16 @@ class Context(WithStatus, Object):
     def oauth_relation(self) -> Relation | None:
         """The Kafka UI oauth relation."""
         return self.model.get_relation(OAUTH_REL)
+
+    @property
+    def ingress_relation(self) -> Relation | None:
+        """The ingress relation."""
+        return self.model.get_relation(INGRESS_REL)
+
+    @property
+    def route_relation(self) -> Relation | None:
+        """The ingress route relation."""
+        return self.model.get_relation(ROUTE_REL)
 
     @property
     def kafka_client(self) -> KafkaClientContext:
@@ -642,21 +705,79 @@ class Context(WithStatus, Object):
     @property
     def endpoint(self) -> str:
         """Returns the UI web server endpoint."""
-        proto = "http" if not SUBSTRATE == "k8s" else "https"
+        proto = "https" if self.unit.tls.ready else "http"
         return f"{proto}://{self.unit.internal_address}:{PORT}{self.context_path}"
 
     @property
     def ingress_url(self) -> str:
         """Returns the ingress URL if available, otherwise the endpoint."""
-        if SUBSTRATE == "k8s":
-            return self.charm.ingress.url or ""
+        if self.route_relation:
+            return f"{self.charm.traefik_route.scheme}://{self.charm.traefik_route.external_host}"
+
+        if self.ingress_relation:
+            ingress_url = self.charm.ingress.url or ""
+            return ingress_url.rstrip("/")
 
         return self.endpoint
+
+    @property
+    def tls_termination(self) -> Literal["charm", "ingress"]:
+        """Return whether TLS termination should be done in the charm or in the ingress.
+
+        In case of VM, where no ingress relation is active, we use either self-signed certs
+        or a TLS relation to do the TLS termination, otherwise we use ingress.
+        """
+        if SUBSTRATE == "k8s" or self.ingress_relation:
+            return "ingress"
+
+        return "charm"
+
+    @property
+    def route_config(self) -> dict:
+        """Return the route config for Traefik."""
+        unique_name = f"{self.charm.app.name}-{uuid.UUID(self.model.uuid).hex[:8]}"
+        return {
+            "http": {
+                "routers": {
+                    unique_name: {
+                        "entryPoints": ["web"],
+                        "rule": f"PathPrefix(`{self.context_path}`)",
+                        "service": f"{unique_name}-service",
+                    }
+                },
+                "services": {
+                    f"{unique_name}-service": {
+                        "loadBalancer": {
+                            "servers": [
+                                {
+                                    "url": f"http://{unit.internal_address}.{self.model.name}.svc.{self.app.cluster_domain}:{PORT}"
+                                }
+                                for unit in self.units
+                            ],
+                            "sticky": {
+                                "cookie": {"name": "kafka-ui", "httpOnly": True, "secure": True},
+                            },
+                            "healthCheck": {
+                                "path": self.context_path,
+                                "interval": "30s",
+                                "timeout": "3s",
+                            },
+                        }
+                    }
+                },
+            }
+        }
 
     @property
     @override
     def status(self) -> Status:
         if not self.kafka_client.ready:
             return self.kafka_client.status
+
+        if self.ingress_relation and self.route_relation:
+            return Status.ROUTE_AND_INGRESS_ERROR
+
+        if self.peer_relation and len(self.peer_relation.units) > 0 and not self.route_relation:
+            return Status.MISSING_ROUTE_HA
 
         return Status.ACTIVE
