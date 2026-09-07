@@ -84,7 +84,7 @@ def test_deploy_ui_and_kafka_active(juju: jubilant.Juju, ui_charm: Path):
     juju.deploy(TLS_APP, app=TLS_APP, channel=TLS_CHANNEL, trust=True)
     juju.deploy(TRAEFIK_APP, app=TRAEFIK_APP, trust=True, channel=TRAEFIK_CHANNEL)
 
-    juju.integrate(TRAEFIK_APP, TLS_APP)
+    juju.integrate(TLS_APP, f"{TRAEFIK_APP}:certificates")
     juju.integrate(APP_NAME, KAFKA_APP)
     juju.integrate(APP_NAME, f"{TRAEFIK_APP}:{INGRESS_REL}")
 
