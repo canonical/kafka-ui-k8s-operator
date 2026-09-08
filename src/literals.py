@@ -30,6 +30,7 @@ KARAPACE_REL = "karapace-client"
 TLS_REL = "certificates"
 OAUTH_REL = "oauth"
 OAUTH_CA_REL = "oauth-ca"
+ROUTE_REL = "traefik-route"
 
 OAUTH_CA_ALIAS_PREFIX = "oauth-ca-"
 JAVA_CACERTS_DEFAULT_PASSWORD = "changeit"
@@ -141,6 +142,10 @@ class Status(Enum):
     INSTALLING = StatusLevel(MaintenanceStatus(f"installing {SNAP_NAME}"), "DEBUG")
     MISSING_KAFKA = StatusLevel(BlockedStatus("application needs Kafka client relation"), "DEBUG")
     MISSING_INGRESS = StatusLevel(BlockedStatus("application needs ingress relation"), "DEBUG")
+    MISSING_INGRESS_HA = StatusLevel(
+        BlockedStatus("application needs an ingress relation when multiple units are deployed."),
+        "WARNING",
+    )
     NO_KAFKA_CREDENTIALS = StatusLevel(
         WaitingStatus("waiting for Kafka cluster credentials"), "DEBUG"
     )

@@ -48,6 +48,7 @@ jobs:
       matrix:
         tox-environments:
           - integration-charm
+          - integration-ha
           - integration-oauth
         tls:
           - "--tls"
@@ -57,7 +58,7 @@ jobs:
       - lint
       - build
     runs-on:  self-hosted-linux-amd64-noble-large
-    timeout-minutes: 60
+    timeout-minutes: 240
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,6 +90,9 @@ jobs:
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' ${{ matrix.tls }}
+        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' ${{ matrix.tls }} --keep-models
         env:
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
+      - name: Setup tmate session
+        uses: canonical/action-tmate@main
+        if: ${{ failure() }}

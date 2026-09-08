@@ -49,9 +49,6 @@ requires:
     interface: tls-certificates
     limit: 1
     optional: true
-  ingress:
-      interface: ingress
-      limit: 1
   oauth:
     interface: oauth
     limit: 1
@@ -59,3 +56,7 @@ requires:
   oauth-ca:
     interface: certificate_transfer
     optional: true
+  traefik-route:
+      interface: traefik_route
+      limit: 1
+      optional: false
