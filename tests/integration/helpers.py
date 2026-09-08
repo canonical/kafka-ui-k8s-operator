@@ -35,6 +35,7 @@ TLS_APP = "self-signed-certificates"
 TLS_CHANNEL = "1/stable"
 TRAEFIK_APP = "traefik-k8s"
 TRAEFIK_CHANNEL = "1.0/stable"
+ROUTE_REL = "traefik-route"
 
 IAM_TERRAFORM_DIR = "tests/integration/terraform/iam"
 IAM_MODEL = "iam"
@@ -222,3 +223,53 @@ class TerraformDeployer:
         for pattern in [".terraform.lock.hcl", "terraform.tfstate*", "*.tfplan"]:
             for path in self.terraform_dir.glob(pattern):
                 path.unlink(missing_ok=True)
+
+
+def get_ui_url(juju: jubilant.Juju) -> str:
+    """Get the URL of Kafka UI."""
+    status = juju.status()
+    unit = next(iter(status.apps[APP_NAME].units.keys()))
+    show_unit = juju.show_unit(unit)
+    match = [rel for rel in show_unit.relation_info if rel.endpoint == "traefik-route"]
+    if not match:
+        raise Exception("No traefik-route relation found!")
+
+    route_rel_data = match[0].app_data
+    base_url = f"{route_rel_data['scheme']}://{route_rel_data['external_host']}"
+    # Full model name contains the controller in the first part.
+    short_model_name = juju.model.split(":")[-1]
+    return f"{base_url}/{short_model_name}-{APP_NAME}"
+
+
+def assert_login(juju: jubilant.Juju, password: str | None = None):
+    """Assert that a user can log in to UI, and access the cluster info API."""
+    if not password:
+        secret_data = get_secret_by_label(juju, label=f"cluster.{APP_NAME}.app", owner=APP_NAME)
+        password = secret_data.get(SECRET_KEY)
+
+    if not password:
+        raise Exception("Can't fetch the admin user's password.")
+
+    url = get_ui_url(juju=juju)
+    login_resp = requests.post(
+        f"{url}/login",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        data={"username": "admin", "password": password},
+        verify=False,
+    )
+    assert login_resp.status_code == 200
+    # Successful login would lead to a redirect
+    assert len(login_resp.history) > 0
+
+    cookies = login_resp.history[0].cookies
+    clusters_resp = requests.get(
+        f"{url}/api/clusters",
+        headers={"Content-Type": "application/json"},
+        cookies=cookies,
+        verify=False,
+    )
+
+    clusters_json = clusters_resp.json()
+    logger.info(f"{clusters_json=}")
+    assert len(clusters_json) > 0
+    assert clusters_json[0].get("status") == "online"

@@ -5,6 +5,7 @@
 """Charm the application."""
 
 import logging
+import socket
 
 import ops
 import requests
@@ -14,7 +15,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
     KarapaceRequirerEventHandlers,
 )
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
-from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
+from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
 from ops import CollectStatusEvent
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_fixed
 
@@ -28,7 +29,7 @@ from literals import (
     KAFKA_CONNECT_REL,
     KAFKA_REL,
     KARAPACE_REL,
-    PORT,
+    ROUTE_REL,
     SUBSTRATE,
     DebugLevel,
     Status,
@@ -53,8 +54,12 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
         self.workload.java_truststore_password = self.context.app.oauth_truststore_password
         self.pending_inactive_statuses: list[Status] = []
 
-        if SUBSTRATE == "k8s":
-            self.ingress = IngressPerAppRequirer(self, port=PORT, scheme="http")
+        self.traefik_route = TraefikRouteRequirer(
+            self,
+            relation=self.context.route_relation,
+            relation_name=ROUTE_REL,
+            raw=False,  # Default: Traefik will append the twin TLS configs.
+        )
 
         # Managers
         self.config_manager = ConfigManager(
@@ -86,7 +91,7 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
         self.framework.observe(self.on.collect_app_status, self._on_collect_status)
 
-        for relation in [KAFKA_REL, KAFKA_CONNECT_REL, KARAPACE_REL]:
+        for relation in [KAFKA_REL, KAFKA_CONNECT_REL, KARAPACE_REL, ROUTE_REL]:
             self.framework.observe(self.on[relation].relation_changed, self._on_config_changed)
             self.framework.observe(self.on[relation].relation_broken, self._on_config_changed)
 
@@ -103,6 +108,7 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        self.reconcile_routes()
         self.oauth.reconcile_ca_truststore()
         self.tls.init_unit_tls()
 
@@ -171,11 +177,11 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
             self._set_status(Status.INSTALLING)
             return False
 
-        if not self.context.kafka_client.ready:
-            self._set_status(Status.MISSING_KAFKA)
+        if not self.context.ready:
+            self._set_status(self.context.status)
             return False
 
-        if SUBSTRATE == "k8s" and not self.ingress.is_ready():
+        if SUBSTRATE == "k8s" and not self.traefik_route.is_ready():
             self._set_status(Status.MISSING_INGRESS)
             return False
 
@@ -190,6 +196,42 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
             return False
 
         return True
+
+    def reconcile_routes(self) -> None:
+        """Reconcile configured routes for the application."""
+        if not self.unit.is_leader():
+            return
+
+        if not self.context.app.cluster_domain:
+            self.context.app.cluster_domain = self.cluster_domain
+
+        if not self.context.route_relation or not self.traefik_route.is_ready():
+            return
+
+        self.traefik_route.submit_to_traefik(config=self.context.route_config)
+
+    @property
+    def cluster_domain(self) -> str:
+        """The DNS domain of the K8s cluster, e.g `cluster.local`.
+
+        Taken from this Pod's own FQDN, as the domain is cluster-configurable.
+        """
+        try:
+            addrinfo_domain = socket.getaddrinfo(
+                self.unit.name.replace("/", "-"),
+                None,
+                family=socket.AF_UNSPEC,
+                flags=socket.AI_CANONNAME,
+                type=socket.SOCK_STREAM,
+            )
+            addrinfo_domain = addrinfo_domain[0][3].split(".svc.")[1]
+        except socket.gaierror:
+            logger.exception("Unable to getaddrinfo, possibly coredns not up")
+            addrinfo_domain = ""  # fallback to getfqdn
+
+        getfqdn_domain = socket.getfqdn().split(".svc.")[1]
+
+        return addrinfo_domain or getfqdn_domain
 
 
 if __name__ == "__main__":  # pragma: nocover
