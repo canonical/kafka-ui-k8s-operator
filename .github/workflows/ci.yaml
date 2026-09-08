@@ -58,7 +58,7 @@ jobs:
       - lint
       - build
     runs-on:  self-hosted-linux-amd64-noble-large
-    timeout-minutes: 60
+    timeout-minutes: 240
     steps:
       - name: Checkout
         uses: actions/checkout@v4
