@@ -50,7 +50,7 @@ def test_deploy_ui_and_kafka_active(juju: jubilant.Juju, ui_charm: Path):
     )
 
 
-def test_scale_with_no_route_rel(juju: jubilant.Juju):
+def test_scale_out(juju: jubilant.Juju):
     juju.add_unit(APP_NAME, num_units=2)
     time.sleep(30)
 
@@ -64,7 +64,8 @@ def test_scale_with_no_route_rel(juju: jubilant.Juju):
     status = juju.status()
     assert status.apps[APP_NAME].app_status.current == "active"
 
-    time.sleep(30)
+    # Wait for Traefik checks to settle
+    time.sleep(90)
     assert_login(juju=juju)
 
 
@@ -79,7 +80,8 @@ def test_min_units_availability(juju: jubilant.Juju):
         if unit != to_keep:
             juju.ssh(unit, "pebble stop kafka-ui", container="kafka-ui")
 
-    time.sleep(30)
+    # Wait for Traefik checks to settle
+    time.sleep(90)
     for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(10), reraise=True):
         with attempt:
             assert_login(juju=juju)
