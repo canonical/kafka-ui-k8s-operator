@@ -55,7 +55,7 @@ Now, expose the ingress service using the [Traefik K8s Operator](https://charmhu
 
 ```bash
 juju deploy traefik-k8s
-juju integrate kafka-ui-k8s traefik-k8s
+juju integrate kafka-ui-k8s traefik-k8s:traefik-route
 ```
 
 Run the `show-proxied-endpoints` Juju Action on the `traefik-k8s` application to get the correct URL:
@@ -71,11 +71,38 @@ URL=${juju run traefik-k8s/leader show-proxied-endpoints | jq '."proxied-endpoin
 firefox --new-tab https://$URL
 ```
 
+## High Availability
+
+Charmed Kafka UI K8s supports scaling to multiple units for high availability:
+
+```bash
+juju add-unit kafka-ui-k8s -n 2
+```
+
+### Refreshing from rev. 9 and lower
+
+Charmed Kafka UI K8s rev. 9 and below uses the `ingress` interface, which does not support
+highly available deployments, and is replaced with the more versatile `traefik-route` interface
+since rev. 10. If you're refreshing, you need to remove the old relation first,
+and then perform refresh:
+
+```bash
+juju remove-relation kafka-ui-k8s traefik-k8s:ingress
+juju refresh kafka-ui-k8s --channel latest/edge
+```
+
+After refresh is done, integrate using the new `traefik-route` interface:
+
+```bash
+juju integrate kafka-ui-k8s traefik:traefik-route
+```
+
 ## Relations
 
 The Charmed Kafka UI Operator supports Juju [relations](https://documentation.ubuntu.com/juju/latest/reference/relation/) for interfaces listed below.
 
-- `ingress` (**required**) with Traefik
+- `traefik-route` (**required**) with Traefik &mdash; required for highly available, multi-unit deployments; see [High Availability](#high-availability)
+- `ingress` (**obsolete**) with Traefik &mdash; single-unit only, superseded by `traefik-route` since rev. 10.
 - `kafka_client` (**required**) with Charmed Apache Kafka
 - `karapace_client` integration with Charmed Karapace
 - `connect_client` integration with Charmed Apache Kafka Connect

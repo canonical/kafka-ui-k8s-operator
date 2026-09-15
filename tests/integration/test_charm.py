@@ -2,13 +2,11 @@
 # Copyright 2025 marc
 # See LICENSE file for licensing details.
 
-import json
 import logging
 from pathlib import Path
 
 import jubilant
 import pytest
-import requests
 from helpers import (
     APP_NAME,
     CONNECT_APP,
@@ -25,6 +23,7 @@ from helpers import (
     TRAEFIK_APP,
     TRAEFIK_CHANNEL,
     all_active_idle,
+    assert_login,
     get_secret_by_label,
     set_password,
 )
@@ -128,43 +127,8 @@ def test_integrate(juju: jubilant.Juju, tls_enabled: bool, apps: list[str]):
         assert status.apps[app].app_status.current == "active"
 
 
-def test_ui(juju: jubilant.Juju, tls_enabled: bool, tmp_path):
-    # get Traefik proixed endpoint for the UI.
-    result = juju.run(f"{TRAEFIK_APP}/0", "show-proxied-endpoints")
-    proxied_endpoints = json.loads(result.results.get("proxied-endpoints"))
-    url = proxied_endpoints.get(APP_NAME, {}).get("url")
-
-    if not url:
-        raise Exception("Can't retrieve proxied endpoint for Kafka UI.")
-
-    secret_data = get_secret_by_label(juju, label=f"cluster.{APP_NAME}.app", owner=APP_NAME)
-    password = secret_data.get(SECRET_KEY)
-
-    if not password:
-        raise Exception("Can't fetch the admin user's password.")
-
-    login_resp = requests.post(
-        f"{url}/login",
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        data={"username": "admin", "password": password},
-        verify=False,
-    )
-    assert login_resp.status_code == 200
-    # Successful login would lead to a redirect
-    assert len(login_resp.history) > 0
-
-    cookies = login_resp.history[0].cookies
-    clusters_resp = requests.get(
-        f"{url}/api/clusters",
-        headers={"Content-Type": "application/json"},
-        cookies=cookies,
-        verify=False,
-    )
-
-    clusters_json = clusters_resp.json()
-    logger.info(f"{clusters_json=}")
-    assert len(clusters_json) > 0
-    assert clusters_json[0].get("status") == "online"
+def test_ui(juju: jubilant.Juju):
+    assert_login(juju=juju)
 
 
 def test_password_rotation(juju: jubilant.Juju, apps: list[str]):
@@ -182,17 +146,4 @@ def test_password_rotation(juju: jubilant.Juju, apps: list[str]):
         successes=10,
     )
 
-    # Check we can login with the new password
-    result = juju.run(f"{TRAEFIK_APP}/0", "show-proxied-endpoints")
-    proxied_endpoints = json.loads(result.results.get("proxied-endpoints"))
-    url = proxied_endpoints.get(APP_NAME, {}).get("url")
-    login_resp = requests.post(
-        f"{url}/login",
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        data={"username": "admin", "password": new_password},
-        verify=False,
-    )
-
-    assert login_resp.status_code == 200
-    # Successful login would lead to a redirect
-    assert len(login_resp.history) > 0
+    assert_login(juju=juju, password=new_password)
