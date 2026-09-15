@@ -30,7 +30,6 @@ KARAPACE_REL = "karapace-client"
 TLS_REL = "certificates"
 OAUTH_REL = "oauth"
 OAUTH_CA_REL = "oauth-ca"
-INGRESS_REL = "ingress"
 ROUTE_REL = "traefik-route"
 
 OAUTH_CA_ALIAS_PREFIX = "oauth-ca-"
@@ -146,19 +145,6 @@ class Status(Enum):
     MISSING_INGRESS_HA = StatusLevel(
         BlockedStatus("application needs an ingress relation when multiple units are deployed."),
         "WARNING",
-    )
-    MISSING_ROUTE_HA = StatusLevel(
-        BlockedStatus(
-            "application needs traefik-route relation when multiple units are deployed."
-        ),
-        "WARNING",
-    )
-    ROUTE_AND_INGRESS_ERROR = StatusLevel(
-        BlockedStatus(
-            "can not integrate with both ingress and traefik-route, "
-            "remove the legacy ingress integration."
-        ),
-        "ERROR",
     )
     NO_KAFKA_CREDENTIALS = StatusLevel(
         WaitingStatus("waiting for Kafka cluster credentials"), "DEBUG"

@@ -35,7 +35,6 @@ TLS_APP = "self-signed-certificates"
 TLS_CHANNEL = "1/stable"
 TRAEFIK_APP = "traefik-k8s"
 TRAEFIK_CHANNEL = "1.0/stable"
-INGRESS_REL = "ingress"
 ROUTE_REL = "traefik-route"
 
 IAM_TERRAFORM_DIR = "tests/integration/terraform/iam"

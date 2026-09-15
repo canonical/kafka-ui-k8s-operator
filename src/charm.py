@@ -16,7 +16,6 @@ from charms.data_platform_libs.v0.data_interfaces import (
 )
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
-from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from ops import CollectStatusEvent
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_fixed
 
@@ -30,7 +29,6 @@ from literals import (
     KAFKA_CONNECT_REL,
     KAFKA_REL,
     KARAPACE_REL,
-    PORT,
     ROUTE_REL,
     SUBSTRATE,
     DebugLevel,
@@ -56,7 +54,6 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
         self.workload.java_truststore_password = self.context.app.oauth_truststore_password
         self.pending_inactive_statuses: list[Status] = []
 
-        self.ingress = IngressPerAppRequirer(self, port=PORT, scheme="http")
         self.traefik_route = TraefikRouteRequirer(
             self,
             relation=self.context.route_relation,
@@ -184,9 +181,7 @@ class KafkaUiCharm(TypedCharmBase[CharmConfig]):
             self._set_status(self.context.status)
             return False
 
-        if SUBSTRATE == "k8s" and not any(
-            [self.ingress.is_ready(), self.traefik_route.is_ready()]
-        ):
+        if SUBSTRATE == "k8s" and not self.traefik_route.is_ready():
             self._set_status(Status.MISSING_INGRESS)
             return False
 

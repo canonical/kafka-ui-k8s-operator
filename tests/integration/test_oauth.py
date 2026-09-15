@@ -153,7 +153,7 @@ async def test_build_and_deploy(
     await ops_test.model.integrate(f"{KAFKA_APP}:certificates", TLS_APP)
     await ops_test.model.integrate(f"{APP_NAME}:certificates", TLS_APP)
     await ops_test.model.integrate(f"{TRAEFIK_UI_APP}:certificates", TLS_APP)
-    await ops_test.model.integrate(f"{APP_NAME}:ingress", TRAEFIK_UI_APP)
+    await ops_test.model.integrate(APP_NAME, TRAEFIK_UI_APP)
 
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME, KAFKA_APP, TRAEFIK_UI_APP, TLS_APP],

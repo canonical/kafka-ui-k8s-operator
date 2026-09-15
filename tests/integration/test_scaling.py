@@ -13,10 +13,8 @@ from helpers import (
     APP_NAME,
     IMAGE_RESOURCE_KEY,
     IMAGE_URI,
-    INGRESS_REL,
     KAFKA_APP,
     KAFKA_CHANNEL,
-    ROUTE_REL,
     SECRET_KEY,
     TLS_APP,
     TLS_CHANNEL,
@@ -86,7 +84,7 @@ def test_deploy_ui_and_kafka_active(juju: jubilant.Juju, ui_charm: Path):
 
     juju.integrate(TLS_APP, f"{TRAEFIK_APP}:certificates")
     juju.integrate(APP_NAME, KAFKA_APP)
-    juju.integrate(APP_NAME, f"{TRAEFIK_APP}:{INGRESS_REL}")
+    juju.integrate(APP_NAME, TRAEFIK_APP)
 
     juju.wait(
         lambda status: all_active_idle(status, KAFKA_APP, APP_NAME, TLS_APP),
@@ -108,31 +106,7 @@ def test_scale_with_no_route_rel(juju: jubilant.Juju):
     )
 
     status = juju.status()
-    # missing traefik-route relation should lead to blocked status
-    assert status.apps[APP_NAME].app_status.current == "blocked"
-
-
-def test_integrate_traefik_route(juju: jubilant.Juju):
-    juju.integrate(APP_NAME, f"{TRAEFIK_APP}:{ROUTE_REL}")
-
-    juju.wait(
-        lambda status: jubilant.all_agents_idle(status, APP_NAME, KAFKA_APP),
-        delay=3,
-        timeout=900,
-        successes=10,
-    )
-
-    status = juju.status()
-    # both ingress & traefik-route relation should lead to blocked status
-    assert status.apps[APP_NAME].app_status.current == "blocked"
-
-    juju.remove_relation(APP_NAME, f"{TRAEFIK_APP}:{INGRESS_REL}")
-    juju.wait(
-        lambda status: all_active_idle(status, APP_NAME, KAFKA_APP),
-        delay=3,
-        timeout=900,
-        successes=10,
-    )
+    assert status.apps[APP_NAME].app_status.current == "active"
 
     time.sleep(30)
     _assert_login(juju=juju)

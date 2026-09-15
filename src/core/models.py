@@ -26,7 +26,6 @@ from typing_extensions import TYPE_CHECKING, Literal, override
 
 from literals import (
     DEFAULT_SECURITY_MECHANISM,
-    INGRESS_REL,
     KAFKA_CONNECT_REL,
     KAFKA_REL,
     KARAPACE_REL,
@@ -651,11 +650,6 @@ class Context(WithStatus, Object):
         return self.model.get_relation(OAUTH_REL)
 
     @property
-    def ingress_relation(self) -> Relation | None:
-        """The ingress relation."""
-        return self.model.get_relation(INGRESS_REL)
-
-    @property
     def route_relation(self) -> Relation | None:
         """The ingress route relation."""
         return self.model.get_relation(ROUTE_REL)
@@ -714,10 +708,6 @@ class Context(WithStatus, Object):
         if self.route_relation:
             return f"{self.charm.traefik_route.scheme}://{self.charm.traefik_route.external_host}"
 
-        if self.ingress_relation:
-            ingress_url = self.charm.ingress.url or ""
-            return ingress_url.rstrip("/")
-
         return self.endpoint
 
     @property
@@ -727,7 +717,7 @@ class Context(WithStatus, Object):
         In case of VM, where no ingress relation is active, we use either self-signed certs
         or a TLS relation to do the TLS termination, otherwise we use ingress.
         """
-        if SUBSTRATE == "k8s" or self.ingress_relation:
+        if SUBSTRATE == "k8s" or self.route_relation:
             return "ingress"
 
         return "charm"
@@ -774,10 +764,7 @@ class Context(WithStatus, Object):
         if not self.kafka_client.ready:
             return self.kafka_client.status
 
-        if self.ingress_relation and self.route_relation:
-            return Status.ROUTE_AND_INGRESS_ERROR
-
         if self.peer_relation and len(self.peer_relation.units) > 0 and not self.route_relation:
-            return Status.MISSING_ROUTE_HA
+            return Status.MISSING_INGRESS_HA
 
         return Status.ACTIVE
