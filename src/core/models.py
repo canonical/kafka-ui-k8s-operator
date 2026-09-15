@@ -699,14 +699,14 @@ class Context(WithStatus, Object):
     @property
     def endpoint(self) -> str:
         """Returns the UI web server endpoint."""
-        proto = "https" if self.unit.tls.ready else "http"
+        proto = "https" if self.tls_termination == "charm" and self.unit.tls.ready else "http"
         return f"{proto}://{self.unit.internal_address}:{PORT}{self.context_path}"
 
     @property
     def ingress_url(self) -> str:
         """Returns the ingress URL if available, otherwise the endpoint."""
         if self.route_relation:
-            return f"{self.charm.traefik_route.scheme}://{self.charm.traefik_route.external_host}"
+            return f"{self.charm.traefik_route.scheme}://{self.charm.traefik_route.external_host}/{self.context_path.lstrip('/')}"
 
         return self.endpoint
 
