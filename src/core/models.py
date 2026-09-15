@@ -748,7 +748,7 @@ class Context(WithStatus, Object):
                                 "cookie": {"name": "kafka-ui", "httpOnly": True, "secure": True},
                             },
                             "healthCheck": {
-                                "path": self.context_path,
+                                "path": f"{self.context_path}/actuator/health",
                                 "interval": "30s",
                                 "timeout": "3s",
                             },
