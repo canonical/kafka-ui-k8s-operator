@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 
 import asyncio
-import json
 import logging
 import re
 
@@ -25,6 +24,7 @@ from helpers import (
     TRAEFIK_CHANNEL,
     TerraformDeployer,
     all_active_idle,
+    get_ui_url,
     wait_for_ui_serving,
 )
 from oauth_tools import (
@@ -190,14 +190,8 @@ async def test_oauth_login_with_identity_bundle(
     ext_idp_service: DexIdpService,
 ) -> None:
     # Fetch the Kafka UI's URL
-    action = (
-        await ops_test.model.applications[TRAEFIK_UI_APP]
-        .units[0]
-        .run_action("show-proxied-endpoints")
-    )
-    result = await action.wait()
-    proxied_endpoints = json.loads(result.results["proxied-endpoints"])
-    url = proxied_endpoints.get(APP_NAME, {}).get("url")
+    _juju = jubilant.Juju(model=ops_test.model_full_name)
+    url = get_ui_url(juju=_juju)
     if not url:
         raise Exception("Can't retrieve proxied endpoint for Kafka UI.")
 
