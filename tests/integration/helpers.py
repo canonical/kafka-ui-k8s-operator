@@ -226,6 +226,7 @@ class TerraformDeployer:
 
 
 def get_ui_url(juju: jubilant.Juju) -> str:
+    """Get the URL of Kafka UI."""
     status = juju.status()
     unit = next(iter(status.apps[APP_NAME].units.keys()))
     show_unit = juju.show_unit(unit)
@@ -235,10 +236,13 @@ def get_ui_url(juju: jubilant.Juju) -> str:
 
     route_rel_data = match[0].app_data
     base_url = f"{route_rel_data['scheme']}://{route_rel_data['external_host']}"
-    return f"{base_url}/{juju.model}-{APP_NAME}"
+    # Full model name contains the controller in the first part.
+    short_model_name = juju.model.split(":")[-1]
+    return f"{base_url}/{short_model_name}-{APP_NAME}"
 
 
 def assert_login(juju: jubilant.Juju, password: str | None = None):
+    """Assert that a user can log in to UI, and access the cluster info API."""
     if not password:
         secret_data = get_secret_by_label(juju, label=f"cluster.{APP_NAME}.app", owner=APP_NAME)
         password = secret_data.get(SECRET_KEY)

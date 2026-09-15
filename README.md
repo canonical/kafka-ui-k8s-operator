@@ -79,26 +79,30 @@ Charmed Kafka UI K8s supports scaling to multiple units for high availability:
 juju add-unit kafka-ui-k8s -n 2
 ```
 
-**The `ingress` relation is obsolete and does not support highly available, multi-unit deployments.** It only routes traffic to a single backend unit, so scaling the application while related over `ingress` will leave the charm in a `blocked` state. Instead, for a highly available cluster, integrate with the `traefik-route` relation, which lets Traefik load-balance requests across every Kafka UI unit:
+### Refreshing from rev. 9 and lower
 
-```bash
-juju integrate kafka-ui-k8s traefik-k8s:traefik-route
-```
-
-The two relations are mutually exclusive: if `kafka-ui-k8s` is related to Traefik over both `ingress` and `traefik-route` at the same time, the charm will also go into `blocked` status. If you are migrating from `ingress`, remove that relation once `traefik-route` is in place:
+Charmed Kafka UI K8s rev. 9 and below uses the `ingress` interface, which does not support
+highly available deployments, and is replaced with the more versatile `traefik-route` interface
+since rev. 10. If you're refreshing, you need to remove the old relation first,
+and then perform refresh:
 
 ```bash
 juju remove-relation kafka-ui-k8s traefik-k8s:ingress
+juju refresh kafka-ui-k8s --channel latest/edge
 ```
 
-Once only the `traefik-route` relation remains, wait for all units to settle into `active|idle`. The Kafka UI cluster is now resilient to individual unit failures &mdash; as long as at least one unit is up and serving, logins and API calls routed through Traefik will keep succeeding even while other units are down or restarting.
+After refresh is done, integrate using the new `traefik-route` interface:
+
+```bash
+juju integrate kafka-ui-k8s traefik:traefik-route
+```
 
 ## Relations
 
 The Charmed Kafka UI Operator supports Juju [relations](https://documentation.ubuntu.com/juju/latest/reference/relation/) for interfaces listed below.
 
 - `traefik-route` (**required**) with Traefik &mdash; required for highly available, multi-unit deployments; see [High Availability](#high-availability)
-- `ingress` (**obsolete**) with Traefik &mdash; single-unit only, superseded by `traefik-route`
+- `ingress` (**obsolete**) with Traefik &mdash; single-unit only, superseded by `traefik-route` since rev. 10.
 - `kafka_client` (**required**) with Charmed Apache Kafka
 - `karapace_client` integration with Charmed Karapace
 - `connect_client` integration with Charmed Apache Kafka Connect
