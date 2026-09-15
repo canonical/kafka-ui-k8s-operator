@@ -15,6 +15,7 @@ from helpers import (
     CONNECT_CHANNEL,
     IMAGE_RESOURCE_KEY,
     IMAGE_URI,
+    INGRESS_REL,
     KAFKA_APP,
     KAFKA_CHANNEL,
     KARAPACE_APP,
@@ -114,7 +115,7 @@ def test_integrate(juju: jubilant.Juju, tls_enabled: bool, apps: list[str]):
     juju.integrate(APP_NAME, KAFKA_APP)
     juju.integrate(APP_NAME, CONNECT_APP)
     juju.integrate(APP_NAME, KARAPACE_APP)
-    juju.integrate(APP_NAME, TRAEFIK_APP)
+    juju.integrate(APP_NAME, f"{TRAEFIK_APP}:{INGRESS_REL}")
 
     juju.wait(
         lambda status: all_active_idle(status, *apps),
